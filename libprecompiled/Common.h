@@ -230,6 +230,7 @@ const Address CRYPTO_ADDRESS = Address(0x5006);
 const char* const NODE_TYPE = "type";
 const char* const NODE_TYPE_SEALER = "sealer";
 const char* const NODE_TYPE_OBSERVER = "observer";
+const char* const NODE_TYPE_LIGHT = "light";
 // working sealer
 const char* const NODE_TYPE_WORKING_SEALER = "wSealer";
 const char* const NODE_KEY_NODEID = "node_id";

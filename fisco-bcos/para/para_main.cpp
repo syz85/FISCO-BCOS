@@ -158,6 +158,7 @@ static void startExecute(int _totalUser, int _totalTxs)
     params->mutableGenesisMark() = "";
     params->mutableConsensusParam().sealerList = dev::h512s();
     params->mutableConsensusParam().observerList = dev::h512s();
+    params->mutableConsensusParam().lightList = dev::h512s();
     params->mutableConsensusParam().consensusType = "";
     params->mutableConsensusParam().maxTransactions = 5000;
     params->mutableTxParam().txGasLimit = 300000000;

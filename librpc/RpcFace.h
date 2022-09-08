@@ -57,6 +57,9 @@ public:
         this->bindAndAddMethod(jsonrpc::Procedure("getObserverList", jsonrpc::PARAMS_BY_POSITION,
                                    jsonrpc::JSON_STRING, "param1", jsonrpc::JSON_INTEGER, NULL),
             &dev::rpc::RpcFace::getObserverListI);
+        this->bindAndAddMethod(jsonrpc::Procedure("getLightList", jsonrpc::PARAMS_BY_POSITION,
+                                   jsonrpc::JSON_STRING, "param1", jsonrpc::JSON_INTEGER, NULL),
+            &dev::rpc::RpcFace::getLightListI);
         this->bindAndAddMethod(jsonrpc::Procedure("getConsensusStatus", jsonrpc::PARAMS_BY_POSITION,
                                    jsonrpc::JSON_OBJECT, "param1", jsonrpc::JSON_INTEGER, NULL),
             &dev::rpc::RpcFace::getConsensusStatusI);
@@ -234,6 +237,10 @@ public:
     inline virtual void getObserverListI(const Json::Value& request, Json::Value& response)
     {
         response = this->getObserverList(boost::lexical_cast<int>(request[0u].asString()));
+    }
+    inline virtual void getLightListI(const Json::Value& request, Json::Value& response)
+    {
+        response = this->getLightList(boost::lexical_cast<int>(request[0u].asString()));
     }
     inline virtual void getConsensusStatusI(const Json::Value& request, Json::Value& response)
     {
@@ -428,6 +435,7 @@ public:
     virtual Json::Value getSealerList(int param1) = 0;
     virtual Json::Value getEpochSealersList(int param1) = 0;
     virtual Json::Value getObserverList(int param1) = 0;
+    virtual Json::Value getLightList(int param1) = 0;
     virtual Json::Value getConsensusStatus(int param1) = 0;
 
     // sync part

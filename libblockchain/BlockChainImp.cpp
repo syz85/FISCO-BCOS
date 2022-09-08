@@ -609,6 +609,8 @@ bool BlockChainImp::checkAndBuildGenesisBlock(
                 tb, NODE_TYPE_SEALER, _initParam->mutableConsensusParam().sealerList);
             initGensisConsensusInfoByNodeType(
                 tb, NODE_TYPE_OBSERVER, _initParam->mutableConsensusParam().observerList);
+            initGensisConsensusInfoByNodeType(
+                tb, NODE_TYPE_OBSERVER, _initParam->mutableConsensusParam().lightList);
             initGenesisWorkingSealers(tb, _initParam);
         }
 
@@ -780,6 +782,11 @@ dev::h512s BlockChainImp::sealerList()
 dev::h512s BlockChainImp::observerList()
 {
     return getNodeList(m_cacheNumByObserver, m_observerList, m_nodeListMutex, NODE_TYPE_OBSERVER);
+}
+
+dev::h512s BlockChainImp::lightList()
+{
+    return getNodeList(m_cacheNumByObserver, m_lightList, m_nodeListMutex, NODE_TYPE_LIGHT);
 }
 
 // TODO: Use pointers as return values to reduce copy overhead

@@ -178,6 +178,7 @@ public:
 
     dev::h512s sealerList() override { return dev::h512s(); };
     dev::h512s observerList() override { return dev::h512s(); };
+    dev::h512s lightList() override { return dev::h512s(); };
     std::string getSystemConfigByKey(std::string const&, int64_t = -1) override
     {
         return "300000000";

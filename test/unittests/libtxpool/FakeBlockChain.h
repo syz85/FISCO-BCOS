@@ -268,8 +268,10 @@ public:
     std::string getSystemConfigByKey(std::string const&, int64_t) override { return "300000000"; };
     dev::h512s sealerList() override { return m_sealerList; }
     dev::h512s observerList() override { return m_observerList; }
+    dev::h512s lightList() override { return m_lightList; }
     void setSealerList(dev::h512s const& sealers) { m_sealerList = sealers; }
     void setObserverList(dev::h512s const& observers) { m_observerList = observers; }
+    void setLightList(dev::h512s const& lights) { m_lightList = lights; }
 
     std::map<h256, int64_t> m_blockHash;
     std::vector<std::shared_ptr<Block>> m_blockChain;
@@ -278,6 +280,7 @@ public:
     KeyPair m_keyPair;
     dev::h512s m_sealerList = dev::h512s();
     dev::h512s m_observerList = dev::h512s();
+    dev::h512s m_lightList = dev::h512s();
 };
 class TxPoolFixture
 {

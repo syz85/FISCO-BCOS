@@ -195,6 +195,7 @@ struct EmptyFixture
         initParam->mutableGenesisMark() = "";
         initParam->mutableConsensusParam().sealerList = dev::h512s();
         initParam->mutableConsensusParam().observerList = dev::h512s();
+        initParam->mutableConsensusParam().lightList = dev::h512s();
         initParam->mutableConsensusParam().consensusType = "";
         initParam->mutableStorageParam().type = "";
         initParam->mutableStateParam().type = "";
@@ -392,6 +393,8 @@ BOOST_AUTO_TEST_CASE(query)
     BOOST_CHECK_EQUAL(sealerList.size(), 0);
     dev::h512s observerList = m_blockChainImp->observerList();
     BOOST_CHECK_EQUAL(observerList.size(), 0);
+    dev::h512s lightList = m_blockChainImp->lightList();
+    BOOST_CHECK_EQUAL(lightList.size(), 0);
 }
 
 BOOST_FIXTURE_TEST_CASE(SM_emptyChain, SM_CryptoTestFixture)

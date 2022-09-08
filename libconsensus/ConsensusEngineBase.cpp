@@ -184,6 +184,10 @@ void ConsensusEngineBase::updateConsensusNodeList()
         dev::h512s observerList = m_blockChain->observerList();
         for (dev::h512 node : observerList)
             s2 << node.abridged() << ",";
+        s2 << "Lights:";
+        dev::h512s lightList = m_blockChain->lightList();
+        for (dev::h512 node : lightList)
+            s2 << node.abridged() << ",";
 
         if (m_lastNodeList != s2.str())
         {
@@ -192,7 +196,7 @@ void ConsensusEngineBase::updateConsensusNodeList()
                               << s2.str();
 
             // get all nodes
-            dev::h512s nodeList = sealerList + observerList;
+            dev::h512s nodeList = sealerList + observerList + lightList;
             std::sort(nodeList.begin(), nodeList.end());
             if (m_blockSync->syncTreeRouterEnabled())
             {

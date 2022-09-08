@@ -93,6 +93,7 @@ public:
     Json::Value getSealerList(int _groupID) override;
     Json::Value getEpochSealersList(int _groupID) override;
     Json::Value getObserverList(int _groupID) override;
+    Json::Value getLightList(int _groupID) override;
     Json::Value getConsensusStatus(int _groupID) override;
 
     // sync part

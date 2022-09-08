@@ -268,7 +268,8 @@ private:
         auto sealerList = m_blockChain->sealerList();
         std::sort(sealerList.begin(), sealerList.end());
         auto observerList = m_blockChain->observerList();
-        auto nodeList = sealerList + observerList;
+        auto lightList = m_blockChain->lightList();
+        auto nodeList = sealerList + observerList + lightList;
         std::sort(nodeList.begin(), nodeList.end());
         updateConsensusNodeInfo(sealerList, nodeList);
     }

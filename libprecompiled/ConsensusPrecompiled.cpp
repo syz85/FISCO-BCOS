@@ -42,12 +42,14 @@ contract ConsensusSystemTable
 
 const char* const CSS_METHOD_ADD_SEALER = "addSealer(string)";
 const char* const CSS_METHOD_ADD_SER = "addObserver(string)";
+const char* const CSS_METHOD_ADD_LIGHT = "addLight(string)";
 const char* const CSS_METHOD_REMOVE = "remove(string)";
 
 ConsensusPrecompiled::ConsensusPrecompiled()
 {
     name2Selector[CSS_METHOD_ADD_SEALER] = getFuncSelector(CSS_METHOD_ADD_SEALER);
     name2Selector[CSS_METHOD_ADD_SER] = getFuncSelector(CSS_METHOD_ADD_SER);
+    name2Selector[CSS_METHOD_ADD_LIGHT] = getFuncSelector(CSS_METHOD_ADD_LIGHT);
     name2Selector[CSS_METHOD_REMOVE] = getFuncSelector(CSS_METHOD_REMOVE);
 }
 

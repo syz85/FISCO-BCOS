@@ -547,6 +547,10 @@ BOOST_AUTO_TEST_CASE(testConsensusPart)
     BOOST_CHECK(observerList.size() == 0);
     BOOST_CHECK_THROW(rpc->getObserverList(invalidGroup), JsonRpcException);
 
+    Json::Value lightList = rpc->getLightList(groupId);
+    BOOST_CHECK(lightList.size() == 0);
+    BOOST_CHECK_THROW(rpc->getLightList(invalidGroup), JsonRpcException);
+
     // test getEpochSealersList
     BOOST_CHECK_THROW(rpc->getEpochSealersList(invalidGroup), JsonRpcException);
     auto param = m_ledgerManager->getParamByGroupId(groupId);

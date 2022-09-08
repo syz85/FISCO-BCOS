@@ -62,6 +62,7 @@ int main(int argc, char* argv[])
     initParam->mutableGenesisMark() = "std";
     initParam->mutableConsensusParam().sealerList = dev::h512s();
     initParam->mutableConsensusParam().observerList = dev::h512s();
+    initParam->mutableConsensusParam().lightList = dev::h512s();
     initParam->mutableConsensusParam().consensusType = "";
     initParam->mutableStorageParam().type = "";
     initParam->mutableStateParam().type = "";

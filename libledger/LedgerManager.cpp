@@ -411,6 +411,14 @@ std::set<dev::GROUP_ID> LedgerManager::getGroupListForRpc() const
         {
             groupList.insert(ledger.second->groupId());
         }
+        /// check light list
+        auto lightList = ledger.second->blockChain()->lightList();
+        auto it_light =
+            find(lightList.begin(), lightList.end(), ledger.second->keyPair().pub());
+        if (it_light != lightList.end())
+        {
+            groupList.insert(ledger.second->groupId());
+        }
     }
     return groupList;
 }

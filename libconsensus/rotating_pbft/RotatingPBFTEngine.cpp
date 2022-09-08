@@ -291,7 +291,7 @@ void RotatingPBFTEngine::updateTreeTopologyInfo()
     if (m_blockSync->syncTreeRouterEnabled())
     {
         // get all the node list of this group
-        auto nodeList = m_blockChain->sealerList() + m_blockChain->observerList();
+        auto nodeList = m_blockChain->sealerList() + m_blockChain->observerList() + m_blockChain->lightList();
         std::sort(nodeList.begin(), nodeList.end());
         m_blockSync->updateConsensusNodeInfo(*m_chosedSealerList, nodeList);
     }

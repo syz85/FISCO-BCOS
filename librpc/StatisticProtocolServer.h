@@ -58,7 +58,7 @@ protected:
 protected:
     // record group related RPC methods
     std::set<std::string> const m_groupRPCMethodSet = {"getSystemConfigByKey", "getBlockNumber",
-        "getPbftView", "getSealerList", "getEpochSealersList", "getObserverList",
+        "getPbftView", "getSealerList", "getEpochSealersList", "getObserverList", "getLightList",
         "getConsensusStatus", "getSyncStatus", "getGroupPeers", "getBlockByHash",
         "getBlockByNumber", "getBlockHashByNumber", "getTransactionByHash",
         "getTransactionByBlockHashAndIndex", "getTransactionByBlockNumberAndIndex",

@@ -334,6 +334,39 @@ Json::Value Rpc::getObserverList(int _groupID)
             JsonRpcException(Errors::ERROR_RPC_INTERNAL_ERROR, boost::diagnostic_information(e)));
     }
 }
+
+Json::Value Rpc::getLightList(int _groupID)
+{
+    try
+    {
+        RPC_LOG(INFO) << LOG_BADGE("getLightList") << LOG_DESC("request")
+                      << LOG_KV("groupID", _groupID);
+
+        auto blockchain = ledgerManager()->blockChain(_groupID);
+        checkLedgerStatus(blockchain, "blockchain", "getLightList");
+        checkRequest(_groupID);
+
+        auto lights = blockchain->lightList();
+
+        Json::Value response = Json::Value(Json::arrayValue);
+        for (auto it = lights.begin(); it != lights.end(); ++it)
+        {
+            response.append((*it).hex());
+        }
+
+        return response;
+    }
+    catch (JsonRpcException& e)
+    {
+        throw e;
+    }
+    catch (std::exception& e)
+    {
+        BOOST_THROW_EXCEPTION(
+            JsonRpcException(Errors::ERROR_RPC_INTERNAL_ERROR, boost::diagnostic_information(e)));
+    }
+}
+
 Json::Value Rpc::getConsensusStatus(int _groupID)
 {
     try

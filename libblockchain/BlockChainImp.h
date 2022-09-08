@@ -128,6 +128,7 @@ public:
 
     dev::h512s sealerList() override;
     dev::h512s observerList() override;
+    dev::h512s lightList() override;
     // get workingSealer list: type == NODE_TYPE_WORKING_SEALER
     dev::h512s workingSealerList() override;
     // get pending list: type ==  NODE_TYPE_SEALER
@@ -248,6 +249,7 @@ private:
     mutable SharedMutex m_nodeListMutex;
     dev::h512s m_sealerList;
     dev::h512s m_observerList;
+    dev::h512s m_lightList;
     dev::h512s m_workingSealerList;
 
     int64_t m_cacheNumByWorkingSealer = -1;

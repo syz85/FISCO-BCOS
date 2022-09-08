@@ -243,9 +243,11 @@ public:
         m_pendingSealerList = getNodeListByType(table, blockNumber, NODE_TYPE_SEALER);
         m_workingSealerList = getNodeListByType(table, blockNumber, NODE_TYPE_WORKING_SEALER);
         m_observerList = getNodeListByType(table, blockNumber, NODE_TYPE_OBSERVER);
+        m_lightList = getNodeListByType(table, blockNumber, NODE_TYPE_LIGHT);
         std::sort(m_pendingSealerList.begin(), m_pendingSealerList.end());
         std::sort(m_workingSealerList.begin(), m_workingSealerList.end());
         std::sort(m_observerList.begin(), m_observerList.end());
+        std::sort(m_lightList.begin(), m_lightList.end());
     }
 
     ~WorkingSealerManagerFixture() {}
@@ -262,6 +264,7 @@ public:
     dev::h512s m_pendingSealerList;
     dev::h512s m_workingSealerList;
     dev::h512s m_observerList;
+    dev::h512s m_lightList;
 
     TableFactory::Ptr memoryTableFactory;
     CachedStorage::Ptr cachedStorage;

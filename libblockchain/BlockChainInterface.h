@@ -95,6 +95,7 @@ public:
     /// get sealer, workingSealer or observer nodes
     virtual dev::h512s sealerList() = 0;
     virtual dev::h512s observerList() = 0;
+    virtual dev::h512s lightList() = 0;
     virtual dev::h512s workingSealerList() { return dev::h512s(); }
     virtual dev::h512s pendingSealerList() { return dev::h512s(); }
 

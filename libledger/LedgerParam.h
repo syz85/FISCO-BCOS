@@ -55,6 +55,7 @@ struct ConsensusParam
     std::string consensusType;
     dev::h512s sealerList = dev::h512s();
     dev::h512s observerList = dev::h512s();
+    dev::h512s lightList = dev::h512s();
     // default consensus timeout time is 3s
     int64_t consensusTimeout = 3;
     int64_t maxTransactions;
