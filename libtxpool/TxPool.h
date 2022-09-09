@@ -221,7 +221,7 @@ private:
 
     void notifyReceipt(dev::eth::Transaction::Ptr _tx, ImportResult const& _verifyRet);
 
-    bool isSealerOrObserver();
+    bool isSealerOrObserverOrLight();
     void registerSyncStatusChecker(std::function<bool()> _handler) override
     {
         m_syncStatusChecker = _handler;

@@ -573,7 +573,8 @@ void SyncMaster::maintainPeersConnection()
 
     // Get sealers and observer
     NodeIDs sealers = m_blockChain->sealerList();
-    NodeIDs sealerOrObserver = sealers + m_blockChain->observerList() + m_blockChain->lightList();
+    // 轻节点可以不保持连接
+    NodeIDs sealerOrObserver = sealers + m_blockChain->observerList();
 
     // member set is [(sealer || observer) && activePeer && not myself]
     set<NodeID> memberSet;

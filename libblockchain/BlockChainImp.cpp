@@ -786,7 +786,7 @@ dev::h512s BlockChainImp::observerList()
 
 dev::h512s BlockChainImp::lightList()
 {
-    return getNodeList(m_cacheNumByObserver, m_lightList, m_nodeListMutex, NODE_TYPE_LIGHT);
+    return getNodeList(m_cacheNumByLight, m_lightList, m_nodeListMutex, NODE_TYPE_LIGHT);
 }
 
 // TODO: Use pointers as return values to reduce copy overhead

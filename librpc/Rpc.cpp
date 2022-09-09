@@ -108,7 +108,7 @@ void Rpc::checkRequest(int _groupID)
         BOOST_THROW_EXCEPTION(
             JsonRpcException(RPCExceptionType::GroupID, RPCMsg[RPCExceptionType::GroupID]));
     }
-    auto _nodeList = blockchain->sealerList() + blockchain->observerList();
+    auto _nodeList = blockchain->sealerList() + blockchain->observerList() + blockchain->lightList();
     auto it = std::find(_nodeList.begin(), _nodeList.end(), service()->id());
     if (it == _nodeList.end())
     {

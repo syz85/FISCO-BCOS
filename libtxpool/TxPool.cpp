@@ -44,7 +44,7 @@ std::pair<h256, Address> TxPool::submit(Transaction::Ptr _tx)
         {
             // RequestNotBelongToTheGroup: 10004
             ImportResult verifyRet = ImportResult::NotBelongToTheGroup;
-            if (isSealerOrObserver())
+            if (isSealerOrObserverOrLight())
             {
                 // check sync status failed
                 if (m_syncStatusChecker && !m_syncStatusChecker())
@@ -203,9 +203,9 @@ std::pair<h256, Address> TxPool::submitTransactions(dev::eth::Transaction::Ptr _
 }
 
 
-bool TxPool::isSealerOrObserver()
+bool TxPool::isSealerOrObserverOrLight()
 {
-    auto _nodeList = m_blockChain->sealerList() + m_blockChain->observerList();
+    auto _nodeList = m_blockChain->sealerList() + m_blockChain->observerList() + m_blockChain->lightList();
     auto it = std::find(_nodeList.begin(), _nodeList.end(), m_service->id());
     if (it == _nodeList.end())
     {

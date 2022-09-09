@@ -36,6 +36,7 @@ contract ConsensusSystemTable
 {
     function addSealer(string nodeID) public returns(int256);
     function addObserver(string nodeID) public returns(int256);
+    function addLight(string nodeID) public returns(int256);
     function remove(string nodeID) public returns(int256);
 }
 */
@@ -200,6 +201,77 @@ PrecompiledExecResult::Ptr ConsensusPrecompiled::call(
                     PRECOMPILED_LOG(DEBUG)
                         << LOG_BADGE("ConsensusPrecompiled")
                         << LOG_DESC("addObserver successfully update") << LOG_KV("result", result);
+                }
+            }
+            else
+            {
+                result = CODE_LAST_SEALER;
+            }
+        }
+    }
+    else if (func == name2Selector[CSS_METHOD_ADD_LIGHT])
+    {
+        // addLight(string)
+        std::string nodeID;
+        abi.abiOut(data, nodeID);
+        // Uniform lowercase nodeID
+        boost::to_lower(nodeID);
+        PRECOMPILED_LOG(DEBUG) << LOG_BADGE("ConsensusPrecompiled") << LOG_DESC("addLight func")
+                               << LOG_KV("nodeID", nodeID);
+        if (nodeID.size() != 128u)
+        {
+            PRECOMPILED_LOG(ERROR) << LOG_BADGE("ConsensusPrecompiled")
+                                   << LOG_DESC("nodeID length error") << LOG_KV("nodeID", nodeID);
+            result = CODE_INVALID_NODEID;
+        }
+        else
+        {
+            storage::Table::Ptr table = openTable(context, SYS_CONSENSUS);
+
+            auto condition = table->newCondition();
+            condition->EQ(NODE_KEY_NODEID, nodeID);
+            auto entries = table->select(PRI_KEY, condition);
+            auto entry = table->newEntry();
+            entry->setField(NODE_TYPE, NODE_TYPE_LIGHT);
+            entry->setField(PRI_COLUMN, PRI_KEY);
+            entry->setField(NODE_KEY_ENABLENUM,
+                boost::lexical_cast<std::string>(context->blockInfo().number + 1));
+
+            if (entries->size() == 0u)
+            {
+                entry->setField(NODE_KEY_NODEID, nodeID);
+                count = table->insert(PRI_KEY, entry, std::make_shared<AccessOptions>(origin));
+                if (count == storage::CODE_NO_AUTHORIZED)
+                {
+                    PRECOMPILED_LOG(DEBUG)
+                        << LOG_BADGE("ConsensusPrecompiled") << LOG_DESC("permission denied");
+                    result = storage::CODE_NO_AUTHORIZED;
+                }
+                else
+                {
+                    result = count;
+                    PRECOMPILED_LOG(DEBUG)
+                        << LOG_BADGE("ConsensusPrecompiled")
+                        << LOG_DESC("addLight successfully insert") << LOG_KV("result", result);
+                }
+            }
+            else if (!checkIsLastSealer(table, nodeID))
+            {
+                count = table->update(
+                    PRI_KEY, entry, condition, std::make_shared<AccessOptions>(origin));
+                if (count == storage::CODE_NO_AUTHORIZED)
+                {
+                    result = storage::CODE_NO_AUTHORIZED;
+                    PRECOMPILED_LOG(DEBUG)
+                        << LOG_BADGE("ConsensusPrecompiled") << LOG_DESC("permission denied")
+                        << LOG_KV("result", result);
+                }
+                else
+                {
+                    result = count;
+                    PRECOMPILED_LOG(DEBUG)
+                        << LOG_BADGE("ConsensusPrecompiled")
+                        << LOG_DESC("addLight successfully update") << LOG_KV("result", result);
                 }
             }
             else

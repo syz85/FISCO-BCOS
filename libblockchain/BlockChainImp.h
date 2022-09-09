@@ -255,6 +255,7 @@ private:
     int64_t m_cacheNumByWorkingSealer = -1;
     int64_t m_cacheNumBySealer = -1;
     int64_t m_cacheNumByObserver = -1;
+    int64_t m_cacheNumByLight = -1;
 
 
     struct SystemConfigRecord

@@ -49,7 +49,8 @@ DEV_SIMPLE_EXCEPTION(BlockSealerListWrong);
 enum NodeAccountType
 {
     ObserverAccount = 0,
-    SealerAccount
+    SealerAccount = 1,
+    LightAccount = 2,
 };
 
 class Sealing
