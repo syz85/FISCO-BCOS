@@ -93,6 +93,7 @@ add_subdirectory(librpc)
 add_subdirectory(libinitializer)
 add_subdirectory(libsecurity)
 add_subdirectory(libeventfilter)
+add_subdirectory(liblight)
 # generate executable binary fisco-bcos
 add_subdirectory(fisco-bcos)
 

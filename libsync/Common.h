@@ -80,6 +80,7 @@ enum SyncPacketType : byte
     ReqBlocskPacket = 0x03,
     TxsStatusPacket = 0x04,
     TxsRequestPacekt = 0x05,
+    HeadersPacket = 0x06,
     PacketCount
 };
 

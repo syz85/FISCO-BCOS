@@ -106,6 +106,9 @@ public:
 
     std::shared_ptr<dev::bytes> getBlockRLPByNumber(int64_t _i) override
     {
+        /**
+         * 这里是Fake，忽略
+         */
         return getBlockByHash(numberHash(_i))->rlpP();
     }
 

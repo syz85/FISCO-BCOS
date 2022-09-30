@@ -24,7 +24,6 @@
 #include "SyncMsgPacket.h"
 #include <libethcore/TxsParallelParser.h>
 #include <libp2p/P2PSession.h>
-#include <libp2p/Service.h>
 
 using namespace std;
 using namespace dev;
@@ -160,7 +159,11 @@ P2PMessage::Ptr SyncTransactionsPacket::toMessage(PROTOCOL_ID _protocolId, bool 
 
 void SyncBlocksPacket::encode(std::vector<dev::bytes> const& _blockRLPs)
 {
+    /**
+     * 批量发送block
+     */
     m_rlpStream.clear();
+    // 有多少个block
     unsigned size = _blockRLPs.size();
     prep(m_rlpStream, BlocksPacket, size);
     for (bytes const& bs : _blockRLPs)

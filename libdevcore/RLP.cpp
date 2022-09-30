@@ -316,6 +316,9 @@ RLPStream& RLPStream::appendList(bytesConstRef _rlp)
 
 RLPStream& RLPStream::append(bytesConstRef _s, bool _compact)
 {
+    /**
+     * 默认不压缩
+     */
     size_t s = _s.size();
     byte const* d = _s.data();
     if (_compact)

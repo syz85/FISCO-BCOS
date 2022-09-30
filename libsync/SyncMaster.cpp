@@ -23,6 +23,7 @@
 #include "SyncMaster.h"
 #include <json/json.h>
 #include <libblockchain/BlockChainInterface.h>
+#include <liblight/Light.h>
 
 using namespace std;
 using namespace dev;
@@ -672,6 +673,9 @@ void SyncMaster::maintainDownloadingQueueBuffer()
 
 void SyncMaster::maintainBlockRequest()
 {
+    /**
+     * 接收到同步区块的请求后，发送区块
+     */
     uint64_t timeout = utcSteadyTime() + c_respondDownloadRequestTimeout;
     m_syncStatus->foreachPeerRandom([&](std::shared_ptr<SyncPeerStatus> _p) {
         DownloadRequestQueue& reqQueue = _p->reqQueue;
@@ -686,15 +690,34 @@ void SyncMaster::maintainBlockRequest()
             DownloadRequest req = reqQueue.topAndPop();
             int64_t number = req.fromNumber;
             int64_t numberLimit = req.fromNumber + req.size;
+            bool isLightNode = isLight(m_blockChain, _p->nodeId);
             SYNC_LOG(DEBUG) << LOG_BADGE("Download Request: response blocks")
                             << LOG_KV("from", req.fromNumber) << LOG_KV("size", req.size)
                             << LOG_KV("numberLimit", numberLimit)
-                            << LOG_KV("peer", _p->nodeId.abridged());
+                            << LOG_KV("peer", _p->nodeId.abridged())
+                            << LOG_KV("isLightNode", isLightNode);
             // Send block at sequence
             for (; number < numberLimit && utcSteadyTime() <= timeout; number++)
             {
                 auto start_get_block_time = utcTime();
-                shared_ptr<bytes> blockRLP = m_blockChain->getBlockRLPByNumber(number);
+                /**
+                 * 重要：这里将区块整理为RLP格式
+                 */
+                shared_ptr<bytes> blockRLP = nullptr;
+                if (isLightNode)
+                {
+                    // 轻节点，只返回blockHeader
+                    shared_ptr<Block> block = m_blockChain->getBlockByNumber(number);
+                    BlockHeader const& blockHeader = block->blockHeader();
+                    bytes blockHeaderBytes;
+                    blockHeader.encode(blockHeaderBytes);
+                    blockRLP = std::make_shared<bytes>(blockHeaderBytes.begin(), blockHeaderBytes.end());
+                }
+                else
+                {
+                    // 非轻节点，返回整个block
+                    blockRLP = m_blockChain->getBlockRLPByNumber(number);
+                }
                 if (!blockRLP)
                 {
                     SYNC_LOG(WARNING)
@@ -726,6 +749,12 @@ void SyncMaster::maintainBlockRequest()
                                << LOG_KV("blockSize", blockRLP->size()) << LOG_KV("number", number)
                                << LOG_KV("peer", _p->nodeId.abridged())
                                << LOG_KV("timeCost", utcTime() - start_get_block_time);
+
+                /**
+                 * 打包后传输：
+                 * 1. 如果区块较小，则积累一定的数量后一起发送
+                 * 2. 如果区块很大，则直接发送该区块；之前积累的小区块继续积累后发送
+                 */
                 blockContainer.batchAndSend(blockRLP);
             }
 

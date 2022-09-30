@@ -257,12 +257,16 @@ std::shared_ptr<Block> BlockChainImp::getBlock(dev::h256 const& _blockHash, int6
 
 std::shared_ptr<bytes> BlockChainImp::getBlockRLP(int64_t _i)
 {
+    /**
+     * 从数据库 NUMBER_2_HASH 表中取出序号对应的区块hash值，转为RLP格式
+     * 1. 从数据库中取出该区块的hash值
+     * 2. 使用hash和序号查找区块
+     */
     /// the future block
     if (_i > number())
     {
         return nullptr;
     }
-    string blockHash = "";
     Table::Ptr tb = getMemoryTableFactory()->openTable(SYS_NUMBER_2_HASH);
     if (tb)
     {
@@ -281,6 +285,10 @@ std::shared_ptr<bytes> BlockChainImp::getBlockRLP(int64_t _i)
 
 std::shared_ptr<bytes> BlockChainImp::getBlockRLP(dev::h256 const& _blockHash, int64_t _blockNumber)
 {
+    /**
+     * 1. 尝试从缓存中找
+     * 2. 第一步失败，则从 hash_2_block 表中找区块
+     */
     auto start_time = utcTime();
     auto record_time = utcTime();
     auto cachedBlock = m_blockCache.get(_blockHash);
@@ -610,7 +618,7 @@ bool BlockChainImp::checkAndBuildGenesisBlock(
             initGensisConsensusInfoByNodeType(
                 tb, NODE_TYPE_OBSERVER, _initParam->mutableConsensusParam().observerList);
             initGensisConsensusInfoByNodeType(
-                tb, NODE_TYPE_OBSERVER, _initParam->mutableConsensusParam().lightList);
+                tb, NODE_TYPE_LIGHT, _initParam->mutableConsensusParam().lightList);
             initGenesisWorkingSealers(tb, _initParam);
         }
 
@@ -894,6 +902,11 @@ std::shared_ptr<Block> BlockChainImp::getBlockByNumber(int64_t _i)
 
 std::shared_ptr<bytes> BlockChainImp::getBlockRLPByNumber(int64_t _i)
 {
+    /**
+     * 获得指定序号区块的RLP编码
+     *  如果区块不存在或找不到，返回空指针
+     */
+
     /// return directly if the blocknumber is invalid
     if (_i > number())
     {
