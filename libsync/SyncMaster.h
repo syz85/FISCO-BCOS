@@ -177,6 +177,12 @@ public:
         fp_isConsensusOk = _handler;
     };
 
+    virtual void registerHeaderConsensusVerifyHandler(
+        std::function<bool(dev::eth::BlockHeader const&)> _handler) override
+    {
+        fp_isHeaderConsensusOk = _handler;
+    };
+
     void noteNewTransactions() { m_syncTrans->noteNewTransactions(); }
 
     void noteNewBlocks()
@@ -343,6 +349,7 @@ private:
 
     // verify handler to check downloading block
     std::function<bool(dev::eth::Block const&)> fp_isConsensusOk = nullptr;
+    std::function<bool(dev::eth::BlockHeader const&)> fp_isHeaderConsensusOk = nullptr;
 
     dev::flowlimit::RateLimiter::Ptr m_bandwidthLimiter;
     dev::flowlimit::RateLimiter::Ptr m_nodeBandwidthLimiter;
@@ -358,6 +365,7 @@ public:
 
 private:
     bool isNextBlock(BlockPtr _block);
+    bool isNextBlockHeader(HeaderPtr _header);
     void printSyncInfo();
 };
 

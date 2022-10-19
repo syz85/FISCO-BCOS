@@ -65,7 +65,9 @@ using NodeList = std::set<dev::p2p::NodeID>;
 using NodeID = dev::p2p::NodeID;
 using NodeIDs = std::vector<dev::p2p::NodeID>;
 using BlockPtr = std::shared_ptr<dev::eth::Block>;
+using HeaderPtr = std::shared_ptr<dev::eth::BlockHeader>;
 using BlockPtrVec = std::vector<BlockPtr>;
+using HeaderPtrVec = std::vector<HeaderPtr>;
 
 #define PUBLIC_LOG LOG_BADGE("SYNC") << "[id:" << m_nodeId.abridged() << "]"
 
@@ -80,7 +82,9 @@ enum SyncPacketType : byte
     ReqBlocskPacket = 0x03,
     TxsStatusPacket = 0x04,
     TxsRequestPacekt = 0x05,
-    HeadersPacket = 0x06,
+
+    // 给轻节点发送的只包含区块头的报文
+    HeadersPacketForLight = 0x06,
     PacketCount
 };
 

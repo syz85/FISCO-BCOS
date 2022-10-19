@@ -218,6 +218,7 @@ public:
     void setProtocolId(PROTOCOL_ID const) override{};
 
     void registerConsensusVerifyHandler(std::function<bool(dev::eth::Block const&)>) override{};
+    void registerHeaderConsensusVerifyHandler(std::function<bool(dev::eth::BlockHeader const&)>) override{};
 
 private:
     SyncStatus m_status;

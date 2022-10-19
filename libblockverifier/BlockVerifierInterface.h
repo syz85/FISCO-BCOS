@@ -50,6 +50,8 @@ public:
 
     virtual ExecutiveContext::Ptr executeBlock(
         dev::eth::Block& block, BlockInfo const& parentBlockInfo) = 0;
+    virtual ExecutiveContext::Ptr executeHeader(
+        dev::eth::BlockHeader& blockHeader, BlockInfo const& parentBlockInfo) = 0;
 
     virtual dev::eth::TransactionReceipt::Ptr executeTransaction(
         const dev::eth::BlockHeader& blockHeader, dev::eth::Transaction::Ptr _t) = 0;

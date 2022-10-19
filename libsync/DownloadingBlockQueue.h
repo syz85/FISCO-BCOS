@@ -55,16 +55,6 @@ struct BlockQueueCmp
 };
 
 
-struct HeaderQueueCmp
-{
-    bool operator()(HeaderPtr const& _a, HeaderPtr const& _b)
-    {
-        // increase order
-        return _a->number() > _b->number();
-    }
-};
-
-
 class DownloadingBlockQueue
 {
 public:
@@ -77,20 +67,16 @@ public:
       : m_blockChain(_blockChain),
         m_nodeId(_nodeId),
         m_blocks(),
-        m_headers(),
-        m_buffer(std::make_shared<ShardPtrVec>()),
-        m_headerBuffer(std::make_shared<ShardPtrVec>())
+        m_buffer(std::make_shared<ShardPtrVec>())
     {}
 
     DownloadingBlockQueue()
-      : m_blockChain(nullptr), m_blocks(), m_headers(), m_buffer(std::make_shared<ShardPtrVec>()), m_headerBuffer(std::make_shared<ShardPtrVec>())
+      : m_blockChain(nullptr), m_blocks(), m_buffer(std::make_shared<ShardPtrVec>())
     {}
 
     /// PUsh a block packet
     void push(RLP const& _rlps);
     void push(BlockPtrVec _blocks);
-
-    void pushHeader(RLP const& _rlps);
 
     /// Is the queue empty?
     bool empty();
@@ -100,34 +86,20 @@ public:
 
     /// pop the top unit of the block queue
     void pop();
-    /// 执行header queue的pop
-    void popHeader();
 
     /// get the top unit of the block queue
     BlockPtr top(bool isFlushBuffer = false);
-    /// 获取header queue的top
-    HeaderPtr topHeader(bool isFlushBuffer = false);
 
     /// clear queue and buffer
     void clear();
 
-    /// 情况header的缓存
-    void clearHeader();
-
     /// clear queue
     void clearQueue();
-
-    /// 情况header的queue
-    void clearHeaderQueue();
 
     /// flush m_buffer into queue
     void flushBufferToQueue();
 
-    /// flush m_headerBuffer into queue
-    void flushHeaderBufferToQueue();
-
     void clearFullQueueIfNotHas(int64_t _blockNumber);
-    void clearFullHeaderQueueIfNotHas(int64_t _blockNumber);
 
     void setMaxBlockQueueSize(int64_t const& _maxBlockQueueSize)
     {
@@ -139,20 +111,15 @@ public:
 
 private:
     bool flushOneShard(ShardPtr _blocksShard);
-    bool flushOneHeaderShard(ShardPtr _headersShard);
 
 private:
     std::shared_ptr<dev::blockchain::BlockChainInterface> m_blockChain;
     NodeID m_nodeId;
     std::priority_queue<BlockPtr, BlockPtrVec, BlockQueueCmp> m_blocks;
-    std::priority_queue<HeaderPtr, HeaderPtrVec, HeaderQueueCmp> m_headers;
     std::shared_ptr<ShardPtrVec> m_buffer;  // use buffer for faster push return
-    std::shared_ptr<ShardPtrVec> m_headerBuffer;
 
     mutable SharedMutex x_blocks;
-    mutable SharedMutex x_headers;
     mutable SharedMutex x_buffer;
-    mutable SharedMutex x_headerBuffer;
 
     // default max block buffer size is 512MB
     int64_t m_maxBlockQueueSize = 512 * 1024 * 1024;
@@ -168,7 +135,6 @@ private:
 
 private:
     bool isNewerBlock(std::shared_ptr<dev::eth::Block> _block);
-    bool isNewerHeader(std::shared_ptr<dev::eth::BlockHeader> _header);
 };
 
 }  // namespace sync

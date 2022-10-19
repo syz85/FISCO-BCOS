@@ -48,22 +48,6 @@ void DownloadingBlockQueue::push(RLP const& _rlps)
 }
 
 
-/// Push a block
-void DownloadingBlockQueue::pushHeader(RLP const& _rlps)
-{
-    WriteGuard l(x_headerBuffer);
-    if (m_headerBuffer->size() >= c_maxDownloadingBlockQueueBufferSize)
-    {
-        SYNC_LOG(WARNING) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
-                          << LOG_DESC("DownloadingBlockQueueHeaderBuffer is full")
-                          << LOG_KV("queueSize", m_headerBuffer->size());
-        return;
-    }
-    ShardPtr headersShard = make_shared<DownloadBlocksShard>(0, 0, _rlps.data().toBytes());
-    m_headerBuffer->emplace_back(headersShard);
-}
-
-
 void DownloadingBlockQueue::adjustMaxRequestBlocks()
 {
     if (m_averageBlockSize == 0)
@@ -148,19 +132,6 @@ void DownloadingBlockQueue::pop()
     }
 }
 
-void DownloadingBlockQueue::popHeader()
-{
-    WriteGuard l(x_headers);
-    if (!m_headers.empty())
-    {
-        m_headers.pop();
-    }
-    // block queue is empty, reset m_maxRequestBlocks to c_maxRequestBlocks
-    else
-    {
-        m_maxRequestBlocks = c_maxRequestBlocks;
-    }
-}
 
 BlockPtr DownloadingBlockQueue::top(bool isFlushBuffer)
 {
@@ -170,19 +141,6 @@ BlockPtr DownloadingBlockQueue::top(bool isFlushBuffer)
     ReadGuard l(x_blocks);
     if (!m_blocks.empty())
         return m_blocks.top();
-    else
-        return nullptr;
-}
-
-
-HeaderPtr DownloadingBlockQueue::topHeader(bool isFlushBuffer)
-{
-    if (isFlushBuffer)
-        flushHeaderBufferToQueue();
-
-    ReadGuard l(x_headers);
-    if (!m_headers.empty())
-        return m_headers.top();
     else
         return nullptr;
 }
@@ -198,15 +156,6 @@ void DownloadingBlockQueue::clear()
     clearQueue();
 }
 
-void DownloadingBlockQueue::clearHeader()
-{
-    {
-        WriteGuard l(x_headerBuffer);
-        m_headerBuffer->clear();
-    }
-
-    clearQueue();
-}
 
 void DownloadingBlockQueue::clearQueue()
 {
@@ -219,16 +168,6 @@ void DownloadingBlockQueue::clearQueue()
 #endif
 }
 
-void DownloadingBlockQueue::clearHeaderQueue()
-{
-    WriteGuard l(x_headers);
-    std::priority_queue<HeaderPtr, HeaderPtrVec, HeaderQueueCmp> emptyQueue;
-    swap(m_headers, emptyQueue);  // Does memory leak here ?
-    // give back the memory to os
-#ifndef FISCO_DEBUG
-    MallocExtension::instance()->ReleaseFreeMemory();
-#endif
-}
 
 void DownloadingBlockQueue::flushBufferToQueue()
 {
@@ -242,17 +181,6 @@ void DownloadingBlockQueue::flushBufferToQueue()
     }
 }
 
-void DownloadingBlockQueue::flushHeaderBufferToQueue()
-{
-    WriteGuard l(x_headerBuffer);
-    bool ret = true;
-    while (m_headerBuffer->size() > 0 && ret)
-    {
-        auto headersShard = m_headerBuffer->front();
-        m_headerBuffer->pop_front();
-        ret = flushOneHeaderShard(headersShard);
-    }
-}
 
 bool DownloadingBlockQueue::flushOneShard(ShardPtr _blocksShard)
 {
@@ -316,56 +244,6 @@ bool DownloadingBlockQueue::flushOneShard(ShardPtr _blocksShard)
 }
 
 
-bool DownloadingBlockQueue::flushOneHeaderShard(ShardPtr _headersShard)
-{
-    // pop buffer into queue
-    WriteGuard l(x_headers);
-    if (m_headers.size() >= c_maxDownloadingBlockQueueSize)  // TODO not to use size to
-                                                            // control insert
-    {
-        SYNC_LOG(TRACE) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
-                        << LOG_DESC("DownloadingHeaderQueueBuffer is full")
-                        << LOG_KV("queueSize", m_headers.size());
-
-        return false;
-    }
-
-    SYNC_LOG(TRACE) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
-                    << LOG_DESC("Decoding header buffer")
-                    << LOG_KV("headersShardSize", _headersShard->blocksBytes.size());
-
-
-    RLP const& rlps = RLP(ref(_headersShard->blocksBytes));
-    unsigned itemCount = rlps.itemCount();
-    size_t successCnt = 0;
-    for (unsigned i = 0; i < itemCount; ++i)
-    {
-        try
-        {
-            // TODO: syz: 这里的 HeaderData 对不对？
-            shared_ptr<BlockHeader> header = make_shared<BlockHeader>(rlps[i].toBytes(), HeaderData);
-            if (isNewerHeader(header))
-            {
-                successCnt++;
-                m_headers.push(header);
-            }
-        }
-        catch (std::exception& e)
-        {
-            SYNC_LOG(WARNING) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
-                              << LOG_DESC("Invalid header RLP") << LOG_KV("reason", e.what())
-                              << LOG_KV("RLPDataSize", rlps.data().size());
-            continue;
-        }
-    }
-
-    SYNC_LOG(TRACE) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
-                    << LOG_DESC("Flush buffer to header queue") << LOG_KV("import", successCnt)
-                    << LOG_KV("rcv", itemCount) << LOG_KV("downloadHeaderQueue", m_headers.size());
-    return true;
-}
-
-
 void DownloadingBlockQueue::clearFullQueueIfNotHas(int64_t _blockNumber)
 {
     bool needClear = false;
@@ -380,35 +258,10 @@ void DownloadingBlockQueue::clearFullQueueIfNotHas(int64_t _blockNumber)
         clearQueue();
 }
 
-void DownloadingBlockQueue::clearFullHeaderQueueIfNotHas(int64_t _blockNumber)
-{
-    bool needClear = false;
-    {
-        ReadGuard l(x_headers);
-
-        if (m_headers.size() == c_maxDownloadingBlockQueueSize &&
-            m_headers.top()->number() > _blockNumber)
-            needClear = true;
-    }
-    if (needClear)
-        clearHeaderQueue();
-}
 
 bool DownloadingBlockQueue::isNewerBlock(shared_ptr<Block> _block)
 {
     if (m_blockChain != nullptr && _block->header().number() <= m_blockChain->number())
-        return false;
-
-    // if (block->header()->)
-    // if //Check sig list
-    // return false;
-
-    return true;
-}
-
-bool DownloadingBlockQueue::isNewerHeader(shared_ptr<BlockHeader> _header)
-{
-    if (m_blockChain != nullptr && _header->number() <= m_blockChain->number())
         return false;
 
     // if (block->header()->)

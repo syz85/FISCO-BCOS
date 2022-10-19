@@ -113,6 +113,7 @@ protected:
     void onPeerStatus(SyncMsgPacket const& _packet);
     void onPeerTransactions(SyncMsgPacket::Ptr _packet, dev::p2p::P2PMessage::Ptr _msg);
     void onPeerBlocks(SyncMsgPacket const& _packet);
+    void onPeerHeaders(SyncMsgPacket const& _packet);
     void onPeerRequestBlocks(SyncMsgPacket const& _packet);
 
     void onPeerTxsStatus(
@@ -159,8 +160,8 @@ public:
     }
     ~DownloadBlocksContainer() { clearBatchAndSend(); }
 
-    void batchAndSend(BlockPtr _block);
-    void batchAndSend(std::shared_ptr<bytes> _blockRLP);
+//    void batchAndSend(BlockPtr _block);
+    void batchAndSend(std::shared_ptr<bytes> _blockRLP, bool isHeader = false);
 
 private:
     void clearBatchAndSend();
@@ -172,7 +173,8 @@ private:
     GROUP_ID m_groupId;
     NodeID m_nodeId;
     std::vector<dev::bytes> m_blockRLPsBatch;
-    size_t m_currentBatchSize = 0;
+    size_t m_currentBlockBatchSize = 0;
+    size_t m_currentHeaderBatchSize = 0;
 };
 
 }  // namespace sync

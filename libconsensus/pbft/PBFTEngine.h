@@ -79,6 +79,8 @@ public:
         /// register checkSealerList to blockSync for check SealerList
         m_blockSync->registerConsensusVerifyHandler(
             boost::bind(&PBFTEngine::checkBlock, this, boost::placeholders::_1));
+        m_blockSync->registerHeaderConsensusVerifyHandler(
+            boost::bind(&PBFTEngine::checkBlockHeader, this, boost::placeholders::_1));
 
         m_threadPool =
             std::make_shared<dev::ThreadPool>("pbftPool-" + std::to_string(m_groupId), 1);
@@ -595,6 +597,8 @@ protected:
     void checkSealerList(dev::eth::Block const& block);
     /// check block
     bool checkBlock(dev::eth::Block const& block);
+    bool checkBlockHeader(dev::eth::BlockHeader const& block);
+
     void execBlock(Sealing& sealing, PrepareReq::Ptr _req, std::ostringstream& oss);
     void changeViewForFastViewChange()
     {

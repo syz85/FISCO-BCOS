@@ -141,6 +141,13 @@ public:
     void singleEncode(dev::bytes const& _blockRLP);
 };
 
+class SyncHeadersPacketForLight : public SyncMsgPacket
+{
+public:
+    SyncHeadersPacketForLight() { packetType = HeadersPacketForLight; }
+    void encode(std::vector<dev::bytes> const& _headerRLPs);
+};
+
 class SyncReqBlockPacket : public SyncMsgPacket
 {
 public:

@@ -22,6 +22,7 @@
 #pragma once
 #include "Common.h"
 #include "DownloadingBlockQueue.h"
+#include "DownloadingHeaderQueue.h"
 #include "RspBlockReq.h"
 #include "SyncMsgPacket.h"
 #include <libblockchain/BlockChainInterface.h>
@@ -98,7 +99,8 @@ public:
         knownLatestHash(_genesisHash),
         m_protocolId(_protocolId),
         m_nodeId(_nodeId),
-        m_downloadingBlockQueue(_blockChain, _protocolId, _nodeId)
+        m_downloadingBlockQueue(_blockChain, _protocolId, _nodeId),
+        m_downloadingHeaderQueue(_blockChain, _protocolId, _nodeId)
     {}
 
     SyncMasterStatus(h256 const& _genesisHash)
@@ -107,7 +109,8 @@ public:
         knownLatestHash(_genesisHash),
         m_protocolId(0),
         m_nodeId(0),
-        m_downloadingBlockQueue(nullptr, 0, NodeID())
+        m_downloadingBlockQueue(nullptr, 0, NodeID()),
+        m_downloadingHeaderQueue(nullptr, 0, NodeID())
     {}
 
     bool hasPeer(NodeID const& _id);
@@ -142,6 +145,8 @@ public:
 
     DownloadingBlockQueue& bq() { return m_downloadingBlockQueue; }
 
+    DownloadingHeaderQueue& hq() { return m_downloadingHeaderQueue; }
+
 private:
     int64_t selectPeers(int64_t const& _neighborSize, std::shared_ptr<NodeIDs> _nodeIds);
 
@@ -158,6 +163,7 @@ private:
     mutable SharedMutex x_peerStatus;
     std::map<NodeID, std::shared_ptr<SyncPeerStatus>> m_peersStatus;
     DownloadingBlockQueue m_downloadingBlockQueue;
+    DownloadingHeaderQueue m_downloadingHeaderQueue;
 };
 
 }  // namespace sync

@@ -61,6 +61,8 @@ public:
     // verify handler to check downloading block
     virtual void registerConsensusVerifyHandler(
         std::function<bool(dev::eth::Block const&)> _handler) = 0;
+    virtual void registerHeaderConsensusVerifyHandler(
+        std::function<bool(dev::eth::BlockHeader const&)> _handler) = 0;
 
     virtual void registerTxsReceiversFilter(std::function<std::shared_ptr<dev::p2p::NodeIDs>(
             std::shared_ptr<std::set<dev::network::NodeID>>)>)

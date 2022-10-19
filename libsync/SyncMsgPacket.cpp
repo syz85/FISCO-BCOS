@@ -197,3 +197,18 @@ void SyncTxsReqPacket::encode(std::shared_ptr<std::vector<dev::h256>> _requested
     m_rlpStream.clear();
     prep(m_rlpStream, packetType, 1).append(*_requestedTxs);
 }
+
+void SyncHeadersPacketForLight::encode(const std::vector<dev::bytes>& _headerRLPs)
+{
+    /**
+     * 批量发送区块头
+     */
+    m_rlpStream.clear();
+    // 有多少个block header需要发送
+    unsigned size = _headerRLPs.size();
+    prep(m_rlpStream, HeadersPacketForLight, size);
+    for (bytes const& bs : _headerRLPs)
+    {
+        m_rlpStream.append(bs);
+    }
+}

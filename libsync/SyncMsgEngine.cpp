@@ -121,6 +121,9 @@ bool SyncMsgEngine::interpret(
         case BlocksPacket:
             onPeerBlocks(*_packet);
             break;
+        case HeadersPacketForLight:
+            onPeerHeaders(*_packet);
+            break;
         case ReqBlocskPacket:
             onPeerRequestBlocks(*_packet);
             break;
@@ -260,6 +263,10 @@ void SyncMsgEngine::onPeerTransactions(SyncMsgPacket::Ptr _packet, dev::p2p::P2P
 
 void SyncMsgEngine::onPeerBlocks(SyncMsgPacket const& _packet)
 {
+    /**
+     * 接收区块
+     */
+
     RLP const& rlps = _packet.rlp();
 
     SYNC_ENGINE_LOG(DEBUG) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
@@ -267,6 +274,26 @@ void SyncMsgEngine::onPeerBlocks(SyncMsgPacket const& _packet)
                            << LOG_KV("packetSize(B)", rlps.data().size());
 
     m_syncStatus->bq().push(rlps);
+    // notify sync master to solve DownloadingQueue
+    if (m_onNotifyWorker)
+    {
+        m_onNotifyWorker();
+    }
+}
+
+void SyncMsgEngine::onPeerHeaders(SyncMsgPacket const& _packet)
+{
+    /**
+     * 接收区块头
+     */
+
+    RLP const& rlps = _packet.rlp();
+
+    SYNC_ENGINE_LOG(DEBUG) << LOG_BADGE("Download") << LOG_BADGE("HeadersSync")
+                           << LOG_DESC("Receive peer header packet")
+                           << LOG_KV("packetSize(B)", rlps.data().size());
+
+    m_syncStatus->hq().pushHeader(rlps);
     // notify sync master to solve DownloadingQueue
     if (m_onNotifyWorker)
     {
@@ -315,32 +342,65 @@ void SyncMsgEngine::onPeerRequestBlocks(SyncMsgPacket const& _packet)
     }
 }
 
-void DownloadBlocksContainer::batchAndSend(BlockPtr _block)
-{
-    // TODO: thread safe
-    std::shared_ptr<bytes> blockRLP = _block->rlpP();
+//void DownloadBlocksContainer::batchAndSend(BlockPtr _block)
+//{
+//    // TODO: thread safe
+//    std::shared_ptr<bytes> blockRLP = _block->rlpP();
+//
+//    batchAndSend(blockRLP);
+//}
 
-    batchAndSend(blockRLP);
-}
-
-void DownloadBlocksContainer::batchAndSend(std::shared_ptr<dev::bytes> _blockRLP)
+void DownloadBlocksContainer::batchAndSend(std::shared_ptr<dev::bytes> _blockRLP, bool isHeader)
 {
     // TODO: thread safe
     bytes& blockRLP = *_blockRLP;
 
     if (blockRLP.size() > c_maxPayload)
     {
+        if (isHeader)
+        {
+            // 如果只发送Header，不应该到这个分支
+            SYNC_ENGINE_LOG(ERROR) << LOG_BADGE("Download") << LOG_BADGE("Request") << LOG_BADGE("BlockSync")
+                                   << LOG_DESC("Send BIG header packet") << LOG_KV("peer", m_nodeId.abridged())
+                                   << LOG_KV("isHeader", isHeader);
+            return;
+        }
         sendBigBlock(blockRLP);
         return;
     }
 
-    // Clear and send batch if full
-    if (m_currentBatchSize + blockRLP.size() > c_maxPayload)
-        clearBatchAndSend();
+    // 如果已经积累到一定的数量，则发送库存
+    if (isHeader)
+    {
+        // 本次发送Header：
+        // 1. 如果有Block待发送，则先清空库存
+        // 2. 如果Header的库存超过阈值，则先清空库存
+        if (m_currentBlockBatchSize > 0 || m_currentHeaderBatchSize + blockRLP.size() > c_maxPayload)
+        {
+            clearBatchAndSend();
+        }
+    }
+    else
+    {
+        // 本次发送Block：
+        // 1. 如果有Header待发送，则先清空库存
+        // 2. 如果Body的库存超过阈值，则先清空库存
+        if (m_currentHeaderBatchSize > 0 || m_currentBlockBatchSize + blockRLP.size() > c_maxPayload)
+        {
+            clearBatchAndSend();
+        }
+    }
 
-    // emplace back block in batch
+    // 将新块放入缓存
     m_blockRLPsBatch.emplace_back(blockRLP);
-    m_currentBatchSize += blockRLP.size();
+    if (isHeader)
+    {
+        m_currentHeaderBatchSize += blockRLP.size();
+    }
+    else
+    {
+        m_currentBlockBatchSize += blockRLP.size();
+    }
 }
 
 void DownloadBlocksContainer::clearBatchAndSend()
@@ -349,19 +409,35 @@ void DownloadBlocksContainer::clearBatchAndSend()
     if (0 == m_blockRLPsBatch.size())
         return;
 
-    SyncBlocksPacket retPacket;
-    retPacket.encode(m_blockRLPsBatch);
+    // Header和Block只会有一种情况
+    shared_ptr<P2PMessage> msg;
+    bool isHeader = (m_currentHeaderBatchSize > 0);
+    if (isHeader)
+    {
+        SyncHeadersPacketForLight retPacket;
+        retPacket.encode(m_blockRLPsBatch);
+        msg = retPacket.toMessage(m_protocolId);
+    }
+    else
+    {
+        SyncBlocksPacket retPacket;
+        retPacket.encode(m_blockRLPsBatch);
+        msg = retPacket.toMessage(m_protocolId);
+    }
 
-    auto msg = retPacket.toMessage(m_protocolId);
     msg->setPermitsAcquired(true);
     m_service->asyncSendMessageByNodeID(m_nodeId, msg, CallbackFuncWithSession(), Options());
     SYNC_ENGINE_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("Request") << LOG_BADGE("BlockSync")
                           << LOG_DESC("Send block packet") << LOG_KV("peer", m_nodeId.abridged())
                           << LOG_KV("blocks", m_blockRLPsBatch.size())
-                          << LOG_KV("bytes(V)", msg->buffer()->size());
+                          << LOG_KV("bytes(V)", msg->buffer()->size())
+                          << LOG_KV("isHeader", isHeader);
 
     m_blockRLPsBatch.clear();
-    m_currentBatchSize = 0;
+    if (isHeader)
+        m_currentHeaderBatchSize = 0;
+    else
+        m_currentBlockBatchSize = 0;
 }
 
 void DownloadBlocksContainer::sendBigBlock(bytes const& _blockRLP)

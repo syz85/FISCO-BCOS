@@ -1549,6 +1549,9 @@ bool BlockChainImp::isBlockShouldCommit(int64_t const& _blockNumber)
 CommitResult BlockChainImp::commitBlock(
     std::shared_ptr<Block> block, std::shared_ptr<ExecutiveContext> context)
 {
+    /**
+     * 提交Block
+     */
     auto start_time = utcTime();
     auto record_time = utcTime();
     if (!isBlockShouldCommit(block->blockHeader().number()))
@@ -1573,6 +1576,116 @@ CommitResult BlockChainImp::commitBlock(
         {
             std::lock_guard<std::mutex> l(commitMutex);
             if (!isBlockShouldCommit(block->blockHeader().number()))
+            {
+                return CommitResult::ERROR_PARENT_HASH;
+            }
+            auto write_record_time = utcTime();
+            tbb::parallel_invoke([this, block, context]() { writeHash2Block(*block, context); },
+                [this, block, context]() { writeNumber2Hash(*block, context); },
+                [this, block, context]() { writeNumber(*block, context); },
+                [this, block, context]() { writeTotalTransactionCount(*block, context); },
+                [this, block, context]() { writeTxToBlock(*block, context); },
+                [this, block, context]() { writeHash2BlockHeader(*block, context); });
+
+            auto write_table_time = utcTime() - write_record_time;
+
+            write_record_time = utcTime();
+            try
+            {
+                context->dbCommit(*block);
+            }
+            catch (std::exception& e)
+            {
+                BLOCKCHAIN_LOG(ERROR)
+                    << LOG_DESC("Commit Block failed")
+                    << LOG_KV("number", block->blockHeader().number()) << LOG_KV("what", e.what());
+                return CommitResult::ERROR_COMMITTING;
+            }
+            auto dbCommit_time_cost = utcTime() - write_record_time;
+            write_record_time = utcTime();
+            {
+                WriteGuard ll(m_blockNumberMutex);
+                m_blockNumber = block->blockHeader().number();
+            }
+            auto updateBlockNumber_time_cost = utcTime() - write_record_time;
+            BLOCKCHAIN_LOG(DEBUG) << LOG_BADGE("Commit")
+                                  << LOG_DESC("Commit block time record(write)")
+                                  << LOG_KV("writeTableTime", write_table_time)
+                                  << LOG_KV("dbCommitTimeCost", dbCommit_time_cost)
+                                  << LOG_KV(
+                                         "updateBlockNumberTimeCost", updateBlockNumber_time_cost);
+        }
+        auto writeBlock_time_cost = utcTime() - record_time;
+        record_time = utcTime();
+
+        m_blockCache.add(block);
+        auto addBlockCache_time_cost = utcTime() - record_time;
+        record_time = utcTime();
+        m_onReady(m_blockNumber);
+        auto noteReady_time_cost = utcTime() - record_time;
+
+        BLOCKCHAIN_LOG(DEBUG) << LOG_BADGE("Commit") << LOG_DESC("Commit block time record")
+                              << LOG_KV("beforeTimeCost", before_write_time_cost)
+                              << LOG_KV("writeBlockTimeCost", writeBlock_time_cost)
+                              << LOG_KV("addBlockCacheTimeCost", addBlockCache_time_cost)
+                              << LOG_KV("noteReadyTimeCost", noteReady_time_cost)
+                              << LOG_KV("totalTimeCost", utcTime() - start_time);
+    }
+    catch (OpenSysTableFailed const& e)
+    {
+        BLOCKCHAIN_LOG(FATAL)
+            << LOG_DESC("[commitBlock]System meets error when try to write block to storage")
+            << LOG_KV("EINFO", boost::diagnostic_information(e));
+        raise(SIGTERM);
+        BOOST_THROW_EXCEPTION(
+            OpenSysTableFailed() << errinfo_comment(" write block to storage failed."));
+    }
+    /// leveldb caused exception: database corruption or the disk has no space left
+    catch (StorageException& e)
+    {
+        BLOCKCHAIN_LOG(FATAL) << LOG_BADGE("CommitBlock: storage exception")
+                              << LOG_KV("EINFO", boost::diagnostic_information(e));
+        raise(SIGTERM);
+        BOOST_THROW_EXCEPTION(
+            OpenSysTableFailed() << errinfo_comment(" write block to storage failed."));
+    }
+    return CommitResult::OK;
+}
+
+CommitResult BlockChainImp::commitHeader(
+    std::shared_ptr<BlockHeader> blockHeader, std::shared_ptr<ExecutiveContext> context)
+{
+    /**
+     * 提交 Header
+     */
+    auto start_time = utcTime();
+    auto record_time = utcTime();
+    if (!isBlockShouldCommit(blockHeader->number()))
+    {
+        return CommitResult::ERROR_NUMBER;
+    }
+
+    h256 parentHash = numberHash(number());
+    if (blockHeader->parentHash() != numberHash(number()))
+    {
+        BLOCKCHAIN_LOG(WARNING) << LOG_DESC(
+                                       "[#commitHeader]Commit fail due to incorrect parent hash")
+                                << LOG_KV("needParentHash", parentHash)
+                                << LOG_KV("committedParentHash", blockHeader->parentHash());
+        return CommitResult::ERROR_PARENT_HASH;
+    }
+
+    // 生成空的Block，只包含Header
+    std::shared_ptr<Block> block = std::make_shared<Block>();
+    block->setBlockHeader(*blockHeader);
+
+    try
+    {
+        auto before_write_time_cost = utcTime() - record_time;
+        record_time = utcTime();
+        {
+            std::lock_guard<std::mutex> l(commitMutex);
+            if (!isBlockShouldCommit(blockHeader->number()))
             {
                 return CommitResult::ERROR_PARENT_HASH;
             }

@@ -847,6 +847,48 @@ bool PBFTEngine::checkBlock(Block const& block)
     return true;
 }
 
+/// check Block sign
+bool PBFTEngine::checkBlockHeader(BlockHeader const& blockHeader)
+{
+    if (blockHeader.number() <= m_blockChain->number())
+    {
+        return false;
+    }
+    {
+        Guard l(m_mutex);
+        resetConfig();
+    }
+    // the current sealer list
+    auto sealers = consensusList();
+    /// ignore the genesis block
+    if (blockHeader.number() == 0)
+    {
+        return true;
+    }
+    {
+        if (sealers != blockHeader.sealerList())
+        {
+            PBFTENGINE_LOG(ERROR) << LOG_DESC("checkBlockHeader: wrong sealers")
+                                  << LOG_KV("Nsealer", sealers.size())
+                                  << LOG_KV("NBlockSealer", blockHeader.sealerList().size())
+                                  << LOG_KV("hash", blockHeader.hash().abridged())
+                                  << LOG_KV("nodeIdx", nodeIdx())
+                                  << LOG_KV("myNode", m_keyPair.pub().abridged());
+            return false;
+        }
+    }
+
+    /// check sealer(sealer must be a sealer)
+    if (getSealerByIndex(blockHeader.sealer().convert_to<size_t>()) == NodeID())
+    {
+        PBFTENGINE_LOG(ERROR) << LOG_DESC("checkBlockHeader: invalid sealer ")
+                              << LOG_KV("sealer", blockHeader.sealer());
+        return false;
+    }
+
+    return true;
+}
+
 bool PBFTEngine::checkSign(IDXTYPE const& _idx, dev::h256 const& _hash, bytes const& _sig)
 {
     h512 nodeId;

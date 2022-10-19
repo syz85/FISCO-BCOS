@@ -440,101 +440,205 @@ void SyncMaster::maintainPeersStatus()
 
 bool SyncMaster::maintainDownloadingQueue()
 {
+    /**
+     * 处理接收到的区块和区块头
+     */
     int64_t currentNumber = m_blockChain->number();
     DownloadingBlockQueue& bq = m_syncStatus->bq();
+    DownloadingHeaderQueue& hq = m_syncStatus->hq();
     if (currentNumber >= m_syncStatus->knownHighestNumber)
     {
         bq.clear();
+        hq.clearHeader();
         return true;
     }
 
-    // pop block in sequence and ignore block which number is lower than currentNumber +1
-    BlockPtr topBlock = bq.top();
-    if (topBlock && topBlock->header().number() > (m_blockChain->number() + 1))
+    // 获取自己是不是Light节点
+    bool isMyselfLight = isLight(m_blockChain, m_service->id());
+    SYNC_LOG(DEBUG) << LOG_BADGE("maintainDownloadingQueue") << LOG_KV("自己的ID", m_service->id().abridged());
+
+    while (true)
     {
-        SYNC_LOG(DEBUG) << LOG_DESC("Discontinuous block")
-                        << LOG_KV("topNumber", topBlock->header().number())
-                        << LOG_KV("curNumber", m_blockChain->number());
-    }
-    while (topBlock != nullptr && topBlock->header().number() <= (m_blockChain->number() + 1))
-    {
+        // pop block in sequence and ignore block which number is lower than currentNumber +1
+        BlockPtr topBlock = bq.top();
+        HeaderPtr topHeader = hq.topHeader();
+
+        // 查看应该先读取header还是先读取block（谁的编号靠前，先处理谁）
+        bool isHeaderFirst;         // 先处理header
+        int64_t minBlockNumber;
+        if (topBlock && topHeader)
+        {
+            // 两边都有数据的情况
+            SYNC_LOG(DEBUG) << LOG_BADGE("maintainDownloadingQueue") << LOG_DESC("同时收到了header和block");
+            isHeaderFirst = topHeader->number() < topBlock->header().number();
+            minBlockNumber = min(topHeader->number(), topBlock->header().number());
+        }
+        else if (topBlock)
+        {
+            // block在前
+            SYNC_LOG(DEBUG) << LOG_BADGE("maintainDownloadingQueue") << LOG_DESC("收到了block");
+            isHeaderFirst = false;
+            minBlockNumber = topBlock->header().number();
+        }
+        else if (topHeader)
+        {
+            // header在前
+            SYNC_LOG(DEBUG) << LOG_BADGE("maintainDownloadingQueue") << LOG_DESC("收到了header");
+            isHeaderFirst = true;
+            minBlockNumber = topHeader->number();
+        }
+        else
+        {
+            // 没有数据，跳出
+            break;
+        }
+
+        // 当前处理的数据出队列
+        if (isHeaderFirst)
+        {
+            hq.popHeader();
+        }
+        else
+        {
+            bq.pop();
+        }
+
         try
         {
-            if (isWorking() && isNextBlock(topBlock))
+            // 如果不是同步状态，则不工作，继续读取下一个数据
+            if (!isWorking())
             {
-                auto record_time = utcTime();
-                auto parentBlock =
-                    m_blockChain->getBlockByNumber(topBlock->blockHeader().number() - 1);
-                BlockInfo parentBlockInfo{parentBlock->header().hash(),
-                    parentBlock->header().number(), parentBlock->header().stateRoot()};
-                auto getBlockByNumber_time_cost = utcTime() - record_time;
-                record_time = utcTime();
+                SYNC_LOG(DEBUG) << LOG_BADGE("maintainDownloadingQueue") << LOG_DESC("is NOT Working");
+                continue;
+            }
+
+            // 如果不是下一个区块，则不工作，继续读取下一个数据
+            // 注意：isNextBlockHeader 和 isNextBlock 是对区块或区块头的正确性核验
+            if (isHeaderFirst)
+            {
+                if (!isNextBlockHeader(topHeader))
+                {
+                    SYNC_LOG(ERROR) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
+                                    << LOG_DESC("Header of queue top is not a valid header")
+                                    << LOG_KV("number", topHeader->number())
+                                    << LOG_KV("hash", topHeader->hash().abridged());
+                    continue;
+                }
+            }
+            else
+            {
+                if (!isNextBlock(topBlock))
+                {
+                    SYNC_LOG(ERROR) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
+                                    << LOG_DESC("Block of queue top is not a valid block")
+                                    << LOG_KV("number", topBlock->header().number())
+                                    << LOG_KV("txs", topBlock->transactions()->size())
+                                    << LOG_KV("hash", topBlock->headerHash().abridged());
+                    continue;
+                }
+            }
+
+            // 查找上一个区块
+            auto record_time = utcTime();
+            auto parentBlock = m_blockChain->getBlockByNumber(minBlockNumber - 1);
+            BlockInfo parentBlockInfo{parentBlock->header().hash(),
+                parentBlock->header().number(), parentBlock->header().stateRoot()};
+            auto getBlockByNumber_time_cost = utcTime() - record_time;
+            record_time = utcTime();
+            if (isHeaderFirst)
+            {
+                SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
+                               << LOG_DESC("Download block header execute")
+                               << LOG_KV("number", topHeader->number())
+                               << LOG_KV("hash", topHeader->hash().abridged());
+
+                // TODO: syz 存储
+
+                ExecutiveContext::Ptr exeCtx =
+                    m_blockVerifier->executeHeader(*topHeader, parentBlockInfo);
+                // 执行失败则跳过
+                if (exeCtx == nullptr)
+                {
+                    continue;
+                }
+            }
+            else
+            {
                 SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
                                << LOG_DESC("Download block execute")
                                << LOG_KV("number", topBlock->header().number())
                                << LOG_KV("txs", topBlock->transactions()->size())
                                << LOG_KV("hash", topBlock->headerHash().abridged());
-                ExecutiveContext::Ptr exeCtx =
-                    m_blockVerifier->executeBlock(*topBlock, parentBlockInfo);
 
-                if (exeCtx == nullptr)
+
+                if (isMyselfLight)
                 {
-                    bq.pop();
-                    topBlock = bq.top();
-                    continue;
-                }
+                    // 如果自己是轻节点
 
-                auto executeBlock_time_cost = utcTime() - record_time;
-                record_time = utcTime();
-
-                CommitResult ret = m_blockChain->commitBlock(topBlock, exeCtx);
-                auto commitBlock_time_cost = utcTime() - record_time;
-                record_time = utcTime();
-                if (ret == CommitResult::OK)
-                {
-                    m_txPool->dropBlockTrans(topBlock);
-                    auto dropBlockTrans_time_cost = utcTime() - record_time;
-                    SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
-                                   << LOG_DESC("Download block commit succ")
-                                   << LOG_KV("number", topBlock->header().number())
-                                   << LOG_KV("txs", topBlock->transactions()->size())
-                                   << LOG_KV("hash", topBlock->headerHash().abridged())
-                                   << LOG_KV("getBlockByNumberTimeCost", getBlockByNumber_time_cost)
-                                   << LOG_KV("executeBlockTimeCost", executeBlock_time_cost)
-                                   << LOG_KV("commitBlockTimeCost", commitBlock_time_cost)
-                                   << LOG_KV("dropBlockTransTimeCost", dropBlockTrans_time_cost);
+                    // TODO: syz 存储
                 }
                 else
                 {
-                    SYNC_LOG(ERROR) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
-                                    << LOG_DESC("Block commit failed")
-                                    << LOG_KV("number", topBlock->header().number())
-                                    << LOG_KV("txs", topBlock->transactions()->size())
-                                    << LOG_KV("hash", topBlock->headerHash().abridged());
-                }
+                    // 如果自己不是轻节点，则可以执行
+
+                    ExecutiveContext::Ptr exeCtx =
+                        m_blockVerifier->executeBlock(*topBlock, parentBlockInfo);
+                    // 执行失败则跳过
+                    if (exeCtx == nullptr)
+                    {
+                        continue;
+                    }
+
+                    auto executeBlock_time_cost = utcTime() - record_time;
+                    record_time = utcTime();
+
+                    CommitResult ret = m_blockChain->commitBlock(topBlock, exeCtx);
+                    auto commitBlock_time_cost = utcTime() - record_time;
+                    record_time = utcTime();
+                    if (ret == CommitResult::OK)
+                    {
+                        m_txPool->dropBlockTrans(topBlock);
+                        auto dropBlockTrans_time_cost = utcTime() - record_time;
+                        SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
+                                       << LOG_DESC("Download block commit succ")
+                                       << LOG_KV("number", topBlock->header().number())
+                                       << LOG_KV("txs", topBlock->transactions()->size())
+                                       << LOG_KV("hash", topBlock->headerHash().abridged())
+                                       << LOG_KV("getBlockByNumberTimeCost", getBlockByNumber_time_cost)
+                                       << LOG_KV("executeBlockTimeCost", executeBlock_time_cost)
+                                       << LOG_KV("commitBlockTimeCost", commitBlock_time_cost)
+                                       << LOG_KV("dropBlockTransTimeCost", dropBlockTrans_time_cost);
+                    }
+                    else
+                    {
+                        SYNC_LOG(ERROR) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
+                                        << LOG_DESC("Block commit failed")
+                                        << LOG_KV("number", topBlock->header().number())
+                                        << LOG_KV("txs", topBlock->transactions()->size())
+                                        << LOG_KV("hash", topBlock->headerHash().abridged());
+                    }
+                }   // if (isMyselfLight) else
+            }   // if (isHeaderFirst) else
+        }
+        catch (exception& e)
+        {
+            if (isHeaderFirst)
+            {
+                SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
+                               << LOG_DESC("Download block header execute")
+                               << LOG_KV("number", topHeader->number())
+                               << LOG_KV("hash", topHeader->hash().abridged());
             }
             else
             {
-                SYNC_LOG(DEBUG) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
-                                << LOG_DESC("Block of queue top is not the next block")
+                SYNC_LOG(ERROR) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
+                                << LOG_DESC("Block of queue top is not a valid block")
                                 << LOG_KV("number", topBlock->header().number())
                                 << LOG_KV("txs", topBlock->transactions()->size())
                                 << LOG_KV("hash", topBlock->headerHash().abridged());
             }
         }
-        catch (exception& e)
-        {
-            SYNC_LOG(ERROR) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
-                            << LOG_DESC("Block of queue top is not a valid block")
-                            << LOG_KV("number", topBlock->header().number())
-                            << LOG_KV("txs", topBlock->transactions()->size())
-                            << LOG_KV("hash", topBlock->headerHash().abridged());
-        }
-
-        bq.pop();
-        topBlock = bq.top();
     }
-
 
     currentNumber = m_blockChain->number();
     // has this request turn finished ?
@@ -577,6 +681,7 @@ void SyncMaster::maintainPeersConnection()
     // 轻节点可以不保持连接
     NodeIDs sealerOrObserver = sealers + m_blockChain->observerList();
 
+    // 记账节点和观察者节点的集合（自己除外）
     // member set is [(sealer || observer) && activePeer && not myself]
     set<NodeID> memberSet;
     bool hasMyself = false;
@@ -590,12 +695,24 @@ void SyncMaster::maintainPeersConnection()
         hasMyself |= (member == m_nodeId);
     }
 
-    // Delete uncorrelated peers
+    // 全部有效节点的集合（自己除外）
+    NodeIDs lights = m_blockChain->lightList();
+    set<NodeID> allMemberSet(memberSet);
+    for (auto const& member : lights)
+    {
+        if (activePeers.find(member) != activePeers.end() && member != m_nodeId)
+        {
+            allMemberSet.insert(member);
+        }
+        hasMyself |= (member == m_nodeId);
+    }
+
+    // Delete uncorrelated peers：节点如果不属于(Sealer/Observer/Light)，则删除
     int64_t currentNumber = m_blockChain->number();
     NodeIDs peersToDelete;
     m_syncStatus->foreachPeer([&](std::shared_ptr<SyncPeerStatus> _p) {
         NodeID id = _p->nodeId;
-        if (memberSet.find(id) == memberSet.end() && currentNumber >= _p->number)
+        if (allMemberSet.find(id) == allMemberSet.end() && currentNumber >= _p->number)
         {
             // Only delete outsider whose number is smaller than myself
             peersToDelete.emplace_back(id);
@@ -608,10 +725,9 @@ void SyncMaster::maintainPeersConnection()
         m_syncStatus->deletePeer(id);
     }
 
-
     // Add new peers
     h256 currentHash = m_blockChain->numberHash(currentNumber);
-    for (auto const& member : memberSet)
+    for (auto const& member : allMemberSet)
     {
         if (member != m_nodeId && !m_syncStatus->hasPeer(member))
         {
@@ -666,9 +782,15 @@ void SyncMaster::maintainDownloadingQueueBuffer()
     {
         m_syncStatus->bq().clearFullQueueIfNotHas(m_blockChain->number() + 1);
         m_syncStatus->bq().flushBufferToQueue();
+
+        m_syncStatus->hq().clearFullHeaderQueueIfNotHas(m_blockChain->number() + 1);
+        m_syncStatus->hq().flushHeaderBufferToQueue();
     }
     else
+    {
         m_syncStatus->bq().clear();
+        m_syncStatus->hq().clearHeader();
+    }
 }
 
 void SyncMaster::maintainBlockRequest()
@@ -711,6 +833,8 @@ void SyncMaster::maintainBlockRequest()
                     BlockHeader const& blockHeader = block->blockHeader();
                     bytes blockHeaderBytes;
                     blockHeader.encode(blockHeaderBytes);
+                    SYNC_LOG(DEBUG) << LOG_BADGE("Send header")
+                                    << LOG_KV("size", blockHeaderBytes.size());
                     blockRLP = std::make_shared<bytes>(blockHeaderBytes.begin(), blockHeaderBytes.end());
                 }
                 else
@@ -718,6 +842,7 @@ void SyncMaster::maintainBlockRequest()
                     // 非轻节点，返回整个block
                     blockRLP = m_blockChain->getBlockRLPByNumber(number);
                 }
+
                 if (!blockRLP)
                 {
                     SYNC_LOG(WARNING)
@@ -727,6 +852,7 @@ void SyncMaster::maintainBlockRequest()
                         << LOG_KV("nodeId", _p->nodeId.abridged());
                     break;
                 }
+
                 auto requiredPermits = blockRLP->size() / g_BCOSConfig.c_compressRate;
                 if (m_nodeBandwidthLimiter && !m_nodeBandwidthLimiter->tryAcquire(requiredPermits))
                 {
@@ -755,7 +881,7 @@ void SyncMaster::maintainBlockRequest()
                  * 1. 如果区块较小，则积累一定的数量后一起发送
                  * 2. 如果区块很大，则直接发送该区块；之前积累的小区块继续积累后发送
                  */
-                blockContainer.batchAndSend(blockRLP);
+                blockContainer.batchAndSend(blockRLP, isLightNode);
             }
 
             if (number < numberLimit)  // This respond not reach the end due to timeout
@@ -810,6 +936,51 @@ bool SyncMaster::isNextBlock(BlockPtr _block)
                           << LOG_KV("thisNumber", _block->header().number())
                           << LOG_KV("currentNumber", currentNumber)
                           << LOG_KV("thisParentHash", _block->header().parentHash().abridged())
+                          << LOG_KV(
+                                 "currentHash", m_blockChain->numberHash(currentNumber).abridged());
+        return false;
+    }
+
+    return true;
+}
+
+bool SyncMaster::isNextBlockHeader(HeaderPtr _header)
+{
+    if (_header == nullptr)
+        return false;
+
+    int64_t currentNumber = m_blockChain->number();
+    if (currentNumber + 1 != _header->number())
+    {
+        SYNC_LOG(WARNING) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
+                          << LOG_DESC("Ignore illegal block header") << LOG_KV("reason", "number illegal")
+                          << LOG_KV("thisNumber", _header->number())
+                          << LOG_KV("currentNumber", currentNumber);
+        return false;
+    }
+
+    if (m_blockChain->numberHash(currentNumber) != _header->parentHash())
+    {
+        SYNC_LOG(WARNING) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
+                          << LOG_DESC("Ignore illegal block header")
+                          << LOG_KV("reason", "parent hash illegal")
+                          << LOG_KV("thisNumber", _header->number())
+                          << LOG_KV("currentNumber", currentNumber)
+                          << LOG_KV("thisParentHash", _header->parentHash().abridged())
+                          << LOG_KV(
+                                 "currentHash", m_blockChain->numberHash(currentNumber).abridged());
+        return false;
+    }
+
+    // check block sealer list
+    if (fp_isHeaderConsensusOk && !(fp_isHeaderConsensusOk)(*_header))
+    {
+        SYNC_LOG(WARNING) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
+                          << LOG_DESC("Ignore illegal block header")
+                          << LOG_KV("reason", "consensus check failed")
+                          << LOG_KV("thisNumber", _header->number())
+                          << LOG_KV("currentNumber", currentNumber)
+                          << LOG_KV("thisParentHash", _header->parentHash().abridged())
                           << LOG_KV(
                                  "currentHash", m_blockChain->numberHash(currentNumber).abridged());
         return false;

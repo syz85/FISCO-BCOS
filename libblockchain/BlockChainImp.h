@@ -111,6 +111,8 @@ public:
     std::shared_ptr<dev::bytes> getBlockRLPByNumber(int64_t _i) override;
     CommitResult commitBlock(std::shared_ptr<dev::eth::Block> block,
         std::shared_ptr<dev::blockverifier::ExecutiveContext> context) override;
+    CommitResult commitHeader(std::shared_ptr<dev::eth::BlockHeader> blockHeader,
+        std::shared_ptr<dev::blockverifier::ExecutiveContext> context);
 
     virtual void setStateStorage(dev::storage::Storage::Ptr stateStorage);
     virtual void setStateFactory(dev::executive::StateFactoryInterface::Ptr _stateFactory);

@@ -40,6 +40,10 @@ using namespace dev::storage;
 
 ExecutiveContext::Ptr BlockVerifier::executeBlock(Block& block, BlockInfo const& parentBlockInfo)
 {
+    /**
+     * 执行区块
+     */
+
     // return nullptr prepare to exit when g_BCOSConfig.shouldExit is true
     if (g_BCOSConfig.shouldExit)
     {
@@ -73,6 +77,48 @@ ExecutiveContext::Ptr BlockVerifier::executeBlock(Block& block, BlockInfo const&
         return nullptr;
     }
     m_executingNumber = block.blockHeader().number();
+    return context;
+}
+
+ExecutiveContext::Ptr BlockVerifier::executeHeader(BlockHeader& blockHeader, BlockInfo const& parentBlockInfo)
+{
+    /**
+     * 执行区块的Header
+     */
+
+    // return nullptr prepare to exit when g_BCOSConfig.shouldExit is true
+    if (g_BCOSConfig.shouldExit)
+    {
+        return nullptr;
+    }
+    if (blockHeader.number() < m_executingNumber)
+    {
+        return nullptr;
+    }
+    std::lock_guard<std::mutex> l(m_executingMutex);
+    if (blockHeader.number() < m_executingNumber)
+    {
+        return nullptr;
+    }
+    ExecutiveContext::Ptr context = nullptr;
+    try
+    {
+        if (g_BCOSConfig.version() >= RC2_VERSION && m_enableParallel)
+        {
+            context = parallelExecuteHeader(blockHeader, parentBlockInfo);
+        }
+        else
+        {
+            context = serialExecuteHeader(blockHeader, parentBlockInfo);
+        }
+    }
+    catch (exception& e)
+    {
+        BLOCKVERIFIER_LOG(ERROR) << LOG_BADGE("executeHeader") << LOG_DESC("executeHeader exception")
+                                 << LOG_KV("blockNumber", blockHeader.number());
+        return nullptr;
+    }
+    m_executingNumber = blockHeader.number();
     return context;
 }
 
@@ -208,6 +254,44 @@ ExecutiveContext::Ptr BlockVerifier::serialExecuteBlock(
                              << LOG_KV("dbHash", block.header().dbHash())
                              << LOG_KV("transactionRoot", block.transactionRoot())
                              << LOG_KV("receiptRoot", block.receiptRoot());
+    return executiveContext;
+}
+
+ExecutiveContext::Ptr BlockVerifier::serialExecuteHeader(
+    BlockHeader& blockHeader, BlockInfo const& parentBlockInfo)
+{
+    BLOCKVERIFIER_LOG(INFO) << LOG_DESC("executeHeader]Executing header")
+                            << LOG_KV("num", blockHeader.number())
+                            << LOG_KV("hash", blockHeader.hash().abridged())
+                            << LOG_KV("height", blockHeader.number())
+                            << LOG_KV("receiptRoot", blockHeader.receiptsRoot())
+                            << LOG_KV("stateRoot", blockHeader.stateRoot())
+                            << LOG_KV("dbHash", blockHeader.dbHash())
+                            << LOG_KV("parentHash", parentBlockInfo.hash.abridged())
+                            << LOG_KV("parentNum", parentBlockInfo.number)
+                            << LOG_KV("parentStateRoot", parentBlockInfo.stateRoot);
+
+    uint64_t startTime = utcTime();
+
+    ExecutiveContext::Ptr executiveContext = std::make_shared<ExecutiveContext>();
+    try
+    {
+        m_executiveContextFactory->initExecutiveContext(
+            parentBlockInfo, parentBlockInfo.stateRoot, executiveContext);
+    }
+    catch (exception& e)
+    {
+        BLOCKVERIFIER_LOG(ERROR) << LOG_DESC("[executeHeader] Error during initExecutiveContext")
+                                 << LOG_KV("blkNum", blockHeader.number())
+                                 << LOG_KV("EINFO", boost::diagnostic_information(e));
+
+        BOOST_THROW_EXCEPTION(InvalidBlockWithBadStateOrReceipt()
+                              << errinfo_comment("Error during initExecutiveContext"));
+    }
+
+    BLOCKVERIFIER_LOG(DEBUG) << LOG_BADGE("executeHeader") << LOG_DESC("Init env takes")
+                             << LOG_KV("time(ms)", utcTime() - startTime);
+
     return executiveContext;
 }
 
@@ -382,6 +466,59 @@ ExecutiveContext::Ptr BlockVerifier::parallelExecuteBlock(
                              << LOG_KV("setAllReceiptTimeCost", setAllReceipt_time_cost)
                              << LOG_KV("getReceiptRootTimeCost", getReceiptRoot_time_cost)
                              << LOG_KV("setStateRootTimeCost", setStateRoot_time_cost);
+    return executiveContext;
+}
+
+
+ExecutiveContext::Ptr BlockVerifier::parallelExecuteHeader(
+    BlockHeader& blockHeader, BlockInfo const& parentBlockInfo)
+
+{
+    BLOCKVERIFIER_LOG(INFO) << LOG_DESC("[executeHeader]Executing header")
+                            << LOG_KV("num", blockHeader.number())
+                            << LOG_KV("parentHash", parentBlockInfo.hash)
+                            << LOG_KV("parentNum", parentBlockInfo.number)
+                            << LOG_KV("parentStateRoot", parentBlockInfo.stateRoot);
+
+    auto start_time = utcTime();
+    auto record_time = utcTime();
+    ExecutiveContext::Ptr executiveContext = std::make_shared<ExecutiveContext>();
+    try
+    {
+        m_executiveContextFactory->initExecutiveContext(
+            parentBlockInfo, parentBlockInfo.stateRoot, executiveContext);
+    }
+    catch (exception& e)
+    {
+        BLOCKVERIFIER_LOG(ERROR) << LOG_DESC("[executeHeader] Error during initExecutiveContext")
+                                 << LOG_KV("EINFO", boost::diagnostic_information(e));
+
+        BOOST_THROW_EXCEPTION(InvalidBlockWithBadStateOrReceipt()
+                              << errinfo_comment("Error during initExecutiveContext"));
+    }
+
+    auto memoryTableFactory = executiveContext->getMemoryTableFactory();
+    auto initExeCtx_time_cost = utcTime() - record_time;
+    record_time = utcTime();
+
+    // 本机计算出来的 stateRoot
+    // 本机如果只有header信息，无法计算stateRoot，所以结果可以忽略
+    h256 stateRoot = executiveContext->getState()->rootHash();
+
+    // if the program is going to exit, return nullptr directly
+    if (g_BCOSConfig.shouldExit)
+    {
+        return nullptr;
+    }
+
+    BLOCKVERIFIER_LOG(DEBUG) << LOG_BADGE("executeHeader") << LOG_DESC("Para execute block takes")
+                             << LOG_KV("time(ms)", utcTime() - start_time)
+                             << LOG_KV("blockNumber", blockHeader.number())
+                             << LOG_KV("blockHash", blockHeader.hash())
+                             << LOG_KV("stateRoot", blockHeader.stateRoot())
+                             << LOG_KV("my stateRoot", stateRoot)
+                             << LOG_KV("dbHash", blockHeader.dbHash())
+                             << LOG_KV("initExeCtxTimeCost", initExeCtx_time_cost);
     return executiveContext;
 }
 

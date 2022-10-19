@@ -65,10 +65,16 @@ public:
     virtual ~BlockVerifier() {}
 
     ExecutiveContext::Ptr executeBlock(dev::eth::Block& block, BlockInfo const& parentBlockInfo);
+    ExecutiveContext::Ptr executeHeader(dev::eth::BlockHeader& blockHeader, BlockInfo const& parentBlockInfo);
     ExecutiveContext::Ptr serialExecuteBlock(
         dev::eth::Block& block, BlockInfo const& parentBlockInfo);
     ExecutiveContext::Ptr parallelExecuteBlock(
         dev::eth::Block& block, BlockInfo const& parentBlockInfo);
+
+    ExecutiveContext::Ptr serialExecuteHeader(
+        dev::eth::BlockHeader& blockHeader, BlockInfo const& parentBlockInfo);
+    ExecutiveContext::Ptr parallelExecuteHeader(
+        dev::eth::BlockHeader& blockHeader, BlockInfo const& parentBlockInfo);
 
 
     dev::eth::TransactionReceipt::Ptr executeTransaction(
