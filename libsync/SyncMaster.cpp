@@ -552,8 +552,6 @@ bool SyncMaster::maintainDownloadingQueue()
                                << LOG_KV("number", topHeader->number())
                                << LOG_KV("hash", topHeader->hash().abridged());
 
-                // TODO: syz 存储
-
                 ExecutiveContext::Ptr exeCtx =
                     m_blockVerifier->executeHeader(*topHeader, parentBlockInfo);
                 // 执行失败则跳过
@@ -561,6 +559,10 @@ bool SyncMaster::maintainDownloadingQueue()
                 {
                     continue;
                 }
+
+                CommitResult ret = m_blockChain->commitHeader(topHeader, exeCtx);
+                SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
+                               << LOG_KV("isCommitHeaderSucess", ret == CommitResult::OK);
             }
             else
             {
@@ -575,7 +577,19 @@ bool SyncMaster::maintainDownloadingQueue()
                 {
                     // 如果自己是轻节点
 
-                    // TODO: syz 存储
+                    // TODO: syz 此处本区块会包含本节点提交的数据，需要验证数据正确后，再储存
+                    // 目前先简化，只验证header
+                    ExecutiveContext::Ptr exeCtx =
+                        m_blockVerifier->executeHeader(topBlock->header(), parentBlockInfo);
+                    // 执行失败则跳过
+                    if (exeCtx == nullptr)
+                    {
+                        continue;
+                    }
+
+                    CommitResult ret = m_blockChain->commitHeader(topHeader, exeCtx);
+                    SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
+                                   << LOG_KV("isCommitHeaderSucess(isMyselfLight)", ret == CommitResult::OK);
                 }
                 else
                 {
