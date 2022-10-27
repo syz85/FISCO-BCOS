@@ -96,6 +96,12 @@ void Transaction::decodeRC1(RLP const& rlp, CheckTransaction _checkSig)
 
         if (_checkSig == CheckTransaction::Everything)
             m_sender = sender();
+
+        if (rlp.itemCount() == c_sigCount + c_fieldCountRC1WithOutSigAndSubmitNodeID)
+        {
+            invalidFieldName = "submitNodeID";
+            m_submitNodeID = rlp[10].toHash<NodeID>(RLP::VeryStrict);
+        }
     }
     catch (Exception& _e)
     {
@@ -150,6 +156,12 @@ void Transaction::decodeRC2(RLP const& rlp, CheckTransaction _checkSig)
 
         if (_checkSig == CheckTransaction::Everything)
             m_sender = sender();
+
+        if (rlp.itemCount() == c_sigCount + c_fieldCountRC2WithOutSigAndSubmitNodeID)
+        {
+            invalidFieldName = "submitNodeID";
+            m_submitNodeID = rlp[13].toHash<NodeID>(RLP::VeryStrict);
+        }
     }
     catch (Exception& _e)
     {
@@ -212,7 +224,7 @@ void Transaction::encodeRC1(bytes& _trans, IncludeSignature _sig) const
     RLPStream _s;
     if (m_type == NullTransaction)
         return;
-    _s.appendList((_sig ? c_sigCount : 0) + c_fieldCountRC1WithOutSig);
+    _s.appendList((_sig ? c_sigCount : 0) + c_fieldCountRC1WithOutSigAndSubmitNodeID);
     _s << m_nonce << m_gasPrice << m_gas << m_blockLimit;
     if (m_type == MessageCall)
         _s << m_receiveAddress;
@@ -228,6 +240,9 @@ void Transaction::encodeRC1(bytes& _trans, IncludeSignature _sig) const
         m_vrs->encode(_s);
     }
 
+    // 提交交易的节点ID，需要放在最后面，因为客户端提交的交易中已经包含了账户的签名
+    _s << m_submitNodeID;
+
     _s.swapOut(_trans);
 }
 
@@ -236,7 +251,7 @@ void Transaction::encodeRC2(bytes& _trans, IncludeSignature _sig) const
     RLPStream _s;
     if (m_type == NullTransaction)
         return;
-    _s.appendList((_sig ? c_sigCount : 0) + c_fieldCountRC2WithOutSig);
+    _s.appendList((_sig ? c_sigCount : 0) + c_fieldCountRC2WithOutSigAndSubmitNodeID);
     _s << m_nonce << m_gasPrice << m_gas << m_blockLimit;
     if (m_type == MessageCall)
         _s << m_receiveAddress;
@@ -251,6 +266,8 @@ void Transaction::encodeRC2(bytes& _trans, IncludeSignature _sig) const
 
         m_vrs->encode(_s);
     }
+
+    _s << m_submitNodeID;
 
     _s.swapOut(_trans);
 }

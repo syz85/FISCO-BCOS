@@ -27,6 +27,7 @@
 #include <tbb/concurrent_unordered_set.h>
 #include <boost/optional.hpp>
 
+using NodeID = dev::h512;
 
 namespace dev
 {
@@ -51,6 +52,11 @@ enum class CheckTransaction
 
 const int c_fieldCountRC1WithOutSig = 7;
 const int c_fieldCountRC2WithOutSig = 10;
+
+// 添加提交交易的节点ID后的数量
+const int c_fieldCountRC1WithOutSigAndSubmitNodeID = c_fieldCountRC1WithOutSig + 1;
+const int c_fieldCountRC2WithOutSigAndSubmitNodeID = c_fieldCountRC2WithOutSig + 1;
+
 const int c_sigCount = 3;
 
 /// function called after the transaction has been submitted
@@ -339,6 +345,16 @@ public:
 
     std::shared_ptr<crypto::Signature> vrs() { return m_vrs; }
 
+    void setSubmitNodeID(NodeID _nodeID)
+    {
+        m_submitNodeID = _nodeID;
+    }
+
+    NodeID submitNodeID()
+    {
+        return m_submitNodeID;
+    }
+
 protected:
     static bool isZeroSignature(u256 const& _r, u256 const& _s) { return !_r && !_s; }
 
@@ -392,6 +408,9 @@ protected:
     mutable dev::SharedMutex x_nodeListWithTheTransaction;
     // Record the node where the transaction exists
     std::set<dev::h512> m_nodeListWithTheTransaction;
+
+    // 负责提交交易的节点ID
+    NodeID m_submitNodeID;
 };
 
 /// Nice name for vector of Transaction.

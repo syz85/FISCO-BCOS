@@ -1304,6 +1304,8 @@ std::string Rpc::sendRawTransaction(int _groupID, const std::string& _rlp,
             jsToBytes(_rlp, OnFailed::Throw), CheckTransaction::Everything);
         // receive transaction from channel or rpc
         tx->setRpcTx(true);
+        // 设置本节点为提交交易的节点
+        tx->setSubmitNodeID(m_service->id());
         auto currentTransactionCallback = m_currentTransactionCallback.get();
 
         uint32_t clientProtocolversion = ProtocolVersion::v1;
