@@ -842,8 +842,27 @@ void SyncMaster::maintainBlockRequest()
                 shared_ptr<bytes> blockRLP = nullptr;
                 if (isLightNode)
                 {
+                    // TODO: syz 需要查看transaction中是否有该轻节点提交的交易
                     // 轻节点，只返回blockHeader
                     shared_ptr<Block> block = m_blockChain->getBlockByNumber(number);
+
+//                    bool blockContainPeerTransaction = false;
+                    auto transactions = block->transactions();
+                    for (size_t i = 0; i < block->transactions()->size(); i++)
+                    {
+                        auto& tx = (*block->transactions())[i];
+
+                        SYNC_LOG(DEBUG) << LOG_BADGE("Send header")
+                                        << LOG_KV("submitNodeID", toHex(tx->submitNodeID()));
+
+//                        // 如果包含目标节点
+//                        if (tx->sender() == _p->nodeId)
+//                        {
+//                            blockContainPeerTransaction = true;
+//                            tx->data()
+//                            break;
+//                        }
+                    }
                     BlockHeader const& blockHeader = block->blockHeader();
                     bytes blockHeaderBytes;
                     blockHeader.encode(blockHeaderBytes);
@@ -888,7 +907,8 @@ void SyncMaster::maintainBlockRequest()
                                << LOG_BADGE("BlockSync") << LOG_DESC("Batch blocks for sending")
                                << LOG_KV("blockSize", blockRLP->size()) << LOG_KV("number", number)
                                << LOG_KV("peer", _p->nodeId.abridged())
-                               << LOG_KV("timeCost", utcTime() - start_get_block_time);
+                               << LOG_KV("timeCost", utcTime() - start_get_block_time)
+                               << LOG_KV("isLightNode", isLightNode);
 
                 /**
                  * 打包后传输：
