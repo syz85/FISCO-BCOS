@@ -150,6 +150,9 @@ void DownloadingTxsQueue::pop2TxPool(
                                               << LOG_KV("reason", boost::diagnostic_information(_e))
                                               << LOG_KV("hash", (*txs)[j]->hash());
                         }
+
+                        SYNC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_BADGE("DownloadingTxsQueue::pop2TxPool")
+                                        << LOG_KV("submitNodeID", (*txs)[j]->submitNodeID());
                     }
                 });
             verifySig_time_cost += (utcTime() - record_time);

@@ -199,7 +199,15 @@ void SyncTransaction::broadcastTransactions(std::shared_ptr<NodeIDs> _selectedPe
 
         for (auto const& i : peerTransactions[_p->nodeId])
         {
-            txRLPs.emplace_back((*_ts)[i]->rlp(WithSignature));
+            auto txRLP = (*_ts)[i]->rlp(WithSignature);
+            txRLPs.emplace_back(txRLP);
+
+            SYNC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_BADGE("SyncTransaction::broadcastTransactions")
+                << LOG_KV("sender", (*_ts)[i]->sender());
+
+            Transaction recoveredTransaction(txRLP, CheckTransaction::Everything);
+            SYNC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_BADGE("SyncTransaction::broadcastTransactions")
+                            << LOG_KV("recovered-sender", recoveredTransaction.sender());
         }
 
 

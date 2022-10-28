@@ -345,12 +345,14 @@ public:
 
     std::shared_ptr<crypto::Signature> vrs() { return m_vrs; }
 
-    void setSubmitNodeID(NodeID _nodeID)
+    void setSubmitNodeID(NodeID const& _nodeID)
     {
+        m_hashWith = h256(0);
+        m_rlpBuffer = bytes();
         m_submitNodeID = _nodeID;
     }
 
-    NodeID submitNodeID()
+    NodeID const& submitNodeID() const
     {
         return m_submitNodeID;
     }

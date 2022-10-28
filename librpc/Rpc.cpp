@@ -1306,6 +1306,7 @@ std::string Rpc::sendRawTransaction(int _groupID, const std::string& _rlp,
         tx->setRpcTx(true);
         // 设置本节点为提交交易的节点
         tx->setSubmitNodeID(m_service->id());
+        RPC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_KV("tx->setSubmitNodeID", tx->submitNodeID());
         auto currentTransactionCallback = m_currentTransactionCallback.get();
 
         uint32_t clientProtocolversion = ProtocolVersion::v1;
@@ -1333,6 +1334,7 @@ std::string Rpc::sendRawTransaction(int _groupID, const std::string& _rlp,
                 });
         }
         // calculate the keccak256 before submit into the transaction pool
+        RPC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_KV("tx->hash", tx->hash()) << LOG_KV("ProtocolVersion", clientProtocolversion);
         tx->hash();
         std::pair<h256, Address> ret;
         switch (clientProtocolversion)
@@ -2021,6 +2023,11 @@ void Rpc::parseTransactionIntoResponse(Json::Value& _response, dev::h256 const& 
     }
     signatureResponse["signature"] = toJS(_tx->vrs()->asBytes());
     _response["signature"] = signatureResponse;
+
+    _response["submitNodeID"] = toJS(_tx->submitNodeID());
+
+    RPC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_BADGE("parseTransactionIntoResponse")
+                   << LOG_KV("submitNodeID", _tx->submitNodeID());
 }
 
 void Rpc::parseReceiptIntoResponse(Json::Value& _response, dev::bytesConstRef _input,

@@ -94,14 +94,20 @@ void Transaction::decodeRC1(RLP const& rlp, CheckTransaction _checkSig)
         if (_checkSig >= CheckTransaction::Cheap && !m_vrs->isValid())
             BOOST_THROW_EXCEPTION(InvalidSignature());
 
-        if (_checkSig == CheckTransaction::Everything)
-            m_sender = sender();
-
-        if (rlp.itemCount() == c_sigCount + c_fieldCountRC1WithOutSigAndSubmitNodeID)
+        size_t itemCount = rlp.itemCount();
+        if (itemCount == c_sigCount + c_fieldCountRC1WithOutSigAndSubmitNodeID)
         {
             invalidFieldName = "submitNodeID";
             m_submitNodeID = rlp[10].toHash<NodeID>(RLP::VeryStrict);
         }
+        else if (itemCount == c_fieldCountRC1WithOutSigAndSubmitNodeID)
+        {
+            invalidFieldName = "submitNodeID";
+            m_submitNodeID = rlp[7].toHash<NodeID>(RLP::VeryStrict);
+        }
+
+        if (_checkSig == CheckTransaction::Everything)
+            m_sender = sender();
     }
     catch (Exception& _e)
     {
@@ -154,14 +160,20 @@ void Transaction::decodeRC2(RLP const& rlp, CheckTransaction _checkSig)
         if (_checkSig >= CheckTransaction::Cheap && !m_vrs->isValid())
             BOOST_THROW_EXCEPTION(InvalidSignature());
 
-        if (_checkSig == CheckTransaction::Everything)
-            m_sender = sender();
-
-        if (rlp.itemCount() == c_sigCount + c_fieldCountRC2WithOutSigAndSubmitNodeID)
+        size_t itemCount = rlp.itemCount();
+        if (itemCount == c_sigCount + c_fieldCountRC2WithOutSigAndSubmitNodeID)
         {
             invalidFieldName = "submitNodeID";
             m_submitNodeID = rlp[13].toHash<NodeID>(RLP::VeryStrict);
         }
+        else if (itemCount == c_fieldCountRC2WithOutSigAndSubmitNodeID)
+        {
+            invalidFieldName = "submitNodeID";
+            m_submitNodeID = rlp[10].toHash<NodeID>(RLP::VeryStrict);
+        }
+
+        if (_checkSig == CheckTransaction::Everything)
+            m_sender = sender();
     }
     catch (Exception& _e)
     {
@@ -224,6 +236,14 @@ void Transaction::encodeRC1(bytes& _trans, IncludeSignature _sig) const
     RLPStream _s;
     if (m_type == NullTransaction)
         return;
+    if (_sig)
+    {
+        _s.appendList(c_sigCount + c_fieldCountRC1WithOutSigAndSubmitNodeID);
+    }
+    else
+    {
+        _s.appendList(c_fieldCountRC1WithOutSig);
+    }
     _s.appendList((_sig ? c_sigCount : 0) + c_fieldCountRC1WithOutSigAndSubmitNodeID);
     _s << m_nonce << m_gasPrice << m_gas << m_blockLimit;
     if (m_type == MessageCall)
@@ -238,10 +258,10 @@ void Transaction::encodeRC1(bytes& _trans, IncludeSignature _sig) const
             BOOST_THROW_EXCEPTION(TransactionIsUnsigned());
 
         m_vrs->encode(_s);
-    }
 
-    // 提交交易的节点ID，需要放在最后面，因为客户端提交的交易中已经包含了账户的签名
-    _s << m_submitNodeID;
+        // 提交交易的节点ID，需要放在最后面，因为客户端提交的交易中已经包含了账户的签名
+        _s << m_submitNodeID;
+    }
 
     _s.swapOut(_trans);
 }
@@ -251,7 +271,15 @@ void Transaction::encodeRC2(bytes& _trans, IncludeSignature _sig) const
     RLPStream _s;
     if (m_type == NullTransaction)
         return;
-    _s.appendList((_sig ? c_sigCount : 0) + c_fieldCountRC2WithOutSigAndSubmitNodeID);
+    if (_sig)
+    {
+        _s.appendList(c_sigCount + c_fieldCountRC2WithOutSigAndSubmitNodeID);
+    }
+    else
+    {
+        _s.appendList(c_fieldCountRC2WithOutSig);
+    }
+
     _s << m_nonce << m_gasPrice << m_gas << m_blockLimit;
     if (m_type == MessageCall)
         _s << m_receiveAddress;
@@ -265,9 +293,9 @@ void Transaction::encodeRC2(bytes& _trans, IncludeSignature _sig) const
             BOOST_THROW_EXCEPTION(TransactionIsUnsigned());
 
         m_vrs->encode(_s);
-    }
 
-    _s << m_submitNodeID;
+        _s << m_submitNodeID;
+    }
 
     _s.swapOut(_trans);
 }

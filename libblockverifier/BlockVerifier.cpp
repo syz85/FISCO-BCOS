@@ -328,6 +328,7 @@ ExecutiveContext::Ptr BlockVerifier::parallelExecuteBlock(
     auto initExeCtx_time_cost = utcTime() - record_time;
     record_time = utcTime();
 
+    // 复制一个header：tmpHeader为原始值
     BlockHeader tmpHeader = block.blockHeader();
     block.clearAllReceipts();
     block.resizeTransactionReceipt(block.transactions()->size());
@@ -511,7 +512,7 @@ ExecutiveContext::Ptr BlockVerifier::parallelExecuteHeader(
         return nullptr;
     }
 
-    BLOCKVERIFIER_LOG(DEBUG) << LOG_BADGE("executeHeader") << LOG_DESC("Para execute block takes")
+    BLOCKVERIFIER_LOG(DEBUG) << LOG_BADGE("executeHeader") << LOG_DESC("Para execute header takes")
                              << LOG_KV("time(ms)", utcTime() - start_time)
                              << LOG_KV("blockNumber", blockHeader.number())
                              << LOG_KV("blockHash", blockHeader.hash())
