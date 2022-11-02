@@ -455,7 +455,7 @@ bool SyncMaster::maintainDownloadingQueue()
 
     // 获取自己是不是Light节点
     bool isMyselfLight = isLight(m_blockChain, m_service->id());
-    SYNC_LOG(DEBUG) << LOG_BADGE("maintainDownloadingQueue") << LOG_KV("自己的ID", m_service->id().abridged());
+    SYNC_LOG(DEBUG) << LOG_BADGE("maintainDownloadingQueue") << LOG_KV("my NodeID", m_service->id().abridged());
 
     while (true)
     {
@@ -562,7 +562,7 @@ bool SyncMaster::maintainDownloadingQueue()
 
                 CommitResult ret = m_blockChain->commitHeader(topHeader, exeCtx);
                 SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
-                               << LOG_KV("isCommitHeaderSucess", ret == CommitResult::OK);
+                               << LOG_KV("isCommitHeaderSuccess", ret == CommitResult::OK);
             }
             else
             {
@@ -575,10 +575,31 @@ bool SyncMaster::maintainDownloadingQueue()
 
                 if (isMyselfLight)
                 {
-                    // 如果自己是轻节点
+                    // 如果自己是轻节点，说明本区块包含自己提交的交易，检查交易，打印
+                    auto transactions = topBlock->transactions();
+                    for (size_t i = 0; i < transactions->size(); i++)
+                    {
+                        auto& tx = (*transactions)[i];
 
-                    // TODO: syz 此处本区块会包含本节点提交的数据，需要验证数据正确后，再储存
-                    // 目前先简化，只验证header
+                        if (tx->submitNodeID() == m_service->id())
+                        {
+                            // 如果包含目标节点
+                            SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
+                                            << LOG_DESC("Block contain tx submitted by myself")
+                                            << LOG_KV("tx->data", toHex(tx->data()));
+                        }
+                        else if (tx->isCreation())
+                        {
+                            // 如果是 deploy 合约的交易，需要执行
+                            SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
+                                           << LOG_DESC("Block contain deployment tx")
+                                           << LOG_KV("tx->data", toHex(tx->data()));
+                        }
+                    }
+
+                    // 目前简化，先不验证 tx->data 是否正确
+
+                    // 执行header的commit
                     ExecutiveContext::Ptr exeCtx =
                         m_blockVerifier->executeHeader(topBlock->header(), parentBlockInfo);
                     // 执行失败则跳过
@@ -588,8 +609,8 @@ bool SyncMaster::maintainDownloadingQueue()
                     }
 
                     CommitResult ret = m_blockChain->commitHeader(topHeader, exeCtx);
-                    SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("HeaderSync")
-                                   << LOG_KV("isCommitHeaderSucess(isMyselfLight)", ret == CommitResult::OK);
+                    SYNC_LOG(INFO) << LOG_BADGE("Download") << LOG_BADGE("BlockSync")
+                                   << LOG_KV("isCommitHeaderSuccess(isMyselfLight)", ret == CommitResult::OK);
                 }
                 else
                 {
@@ -839,40 +860,79 @@ void SyncMaster::maintainBlockRequest()
                 /**
                  * 重要：这里将区块整理为RLP格式
                  */
+                bool isSendHeader;
                 shared_ptr<bytes> blockRLP = nullptr;
                 if (isLightNode)
                 {
-                    // TODO: syz 需要查看transaction中是否有该轻节点提交的交易
-                    // 轻节点，只返回blockHeader
+                    // 需要查看transaction中是否有该轻节点提交的交易
+
+                    // 轻节点
+                    // 1. 如果区块中不包含目标节点提交的交易，则只返回blockHeader
+                    // 2. 如果包含，则返回整个区块
                     shared_ptr<Block> block = m_blockChain->getBlockByNumber(number);
 
-//                    bool blockContainPeerTransaction = false;
+                    bool blockNeedSend = false;
                     auto transactions = block->transactions();
                     for (size_t i = 0; i < block->transactions()->size(); i++)
                     {
                         auto& tx = (*block->transactions())[i];
 
-                        SYNC_LOG(DEBUG) << LOG_BADGE("Send header")
-                                        << LOG_KV("submitNodeID", toHex(tx->submitNodeID()));
+                        SYNC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_BADGE("SyncMaster::maintainBlockRequest")
+                                        << LOG_KV("submitNodeID", toHex(tx->submitNodeID()))
+                                        << LOG_KV("addLightNodeID", toHex(tx->addLightNodeID()))
+                                        << LOG_KV("_p->nodeId", _p->nodeId);
 
-//                        // 如果包含目标节点
-//                        if (tx->sender() == _p->nodeId)
-//                        {
-//                            blockContainPeerTransaction = true;
-//                            tx->data()
-//                            break;
-//                        }
+                        if (tx->submitNodeID() == _p->nodeId)
+                        {
+                            // 如果包含目标节点提交的交易
+                            blockNeedSend = true;
+                            SYNC_LOG(DEBUG) << LOG_BADGE("SyncMaster::maintainBlockRequest") << LOG_DESC("Contain Light Tx")
+                                << LOG_KV("lightNodeID", _p->nodeId);
+                            break;
+                        }
+                        else if (tx->addLightNodeID() == _p->nodeId)
+                        {
+                            // 如果是 addLightNode 交易，并且目标节点是该节点
+                            blockNeedSend = true;
+                            SYNC_LOG(DEBUG) << LOG_BADGE("SyncMaster::maintainBlockRequest") << LOG_DESC("Contain AddLightNode Tx")
+                                            << LOG_KV("lightNodeID", _p->nodeId);
+                            break;
+                        }
+                        else if (tx->isCreation())
+                        {
+                            // 如果是 deploy 合约的交易
+                            blockNeedSend = true;
+                            SYNC_LOG(DEBUG) << LOG_BADGE("SyncMaster::maintainBlockRequest") << LOG_DESC("Contain Deploy Tx")
+                                            << LOG_KV("lightNodeID", _p->nodeId);
+                            break;
+                        }
                     }
-                    BlockHeader const& blockHeader = block->blockHeader();
-                    bytes blockHeaderBytes;
-                    blockHeader.encode(blockHeaderBytes);
+
+                    bytes blockOrHeaderBytes;
+                    if (blockNeedSend)
+                    {
+                        isSendHeader = false;
+                        block->encode(blockOrHeaderBytes);
+                        SYNC_LOG(DEBUG) << LOG_BADGE("SyncMaster::maintainBlockRequest") << LOG_DESC("Send block")
+                                        << LOG_KV("lightNodeID", _p->nodeId);
+                    }
+                    else
+                    {
+                        isSendHeader = true;
+                        block->blockHeader().encode(blockOrHeaderBytes);
+                        SYNC_LOG(DEBUG) << LOG_BADGE("SyncMaster::maintainBlockRequest") << LOG_DESC("Send Header")
+                                        << LOG_KV("lightNodeID", _p->nodeId);
+                    }
+
                     SYNC_LOG(DEBUG) << LOG_BADGE("Send header")
-                                    << LOG_KV("size", blockHeaderBytes.size());
-                    blockRLP = std::make_shared<bytes>(blockHeaderBytes.begin(), blockHeaderBytes.end());
+                                    << LOG_KV("size", blockOrHeaderBytes.size());
+                    blockRLP = std::make_shared<bytes>(
+                        blockOrHeaderBytes.begin(), blockOrHeaderBytes.end());
                 }
                 else
                 {
                     // 非轻节点，返回整个block
+                    isSendHeader = false;
                     blockRLP = m_blockChain->getBlockRLPByNumber(number);
                 }
 
@@ -915,10 +975,10 @@ void SyncMaster::maintainBlockRequest()
                  * 1. 如果区块较小，则积累一定的数量后一起发送
                  * 2. 如果区块很大，则直接发送该区块；之前积累的小区块继续积累后发送
                  */
-                blockContainer.batchAndSend(blockRLP, isLightNode);
+                blockContainer.batchAndSend(blockRLP, isSendHeader);
             }
 
-            if (number < numberLimit)  // This respond not reach the end due to timeout
+            if (number < numberLimit)  // This response not reach the end due to timeout
             {
                 // write back the rest request range
                 SYNC_LOG(DEBUG) << LOG_BADGE("Download") << LOG_BADGE("Request")

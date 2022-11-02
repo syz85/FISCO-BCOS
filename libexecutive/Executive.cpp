@@ -138,6 +138,9 @@ bool Executive::execute()
     }
     else
     {
+        /**
+         * 调用合约
+         */
         return call(m_t->receiveAddress(), m_t->sender(), m_t->value(), m_t->gasPrice(),
             bytesConstRef(&m_t->data()), txGasLimit - (u256)m_baseGasRequired);
     }
@@ -146,6 +149,9 @@ bool Executive::execute()
 bool Executive::call(Address const& _receiveAddress, Address const& _senderAddress,
     u256 const& _value, u256 const& _gasPrice, bytesConstRef _data, u256 const& _gas)
 {
+    /**
+     * 调用合约
+     */
     CallParameters params{
         _senderAddress, _receiveAddress, _receiveAddress, _value, _value, _gas, _data};
     return call(params, _gasPrice, _senderAddress);
@@ -170,6 +176,10 @@ void Executive::updateGas(std::shared_ptr<dev::precompiled::PrecompiledExecResul
 
 bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address const& _origin)
 {
+    /**
+     * 调用合约
+     */
+
     if (g_BCOSConfig.version() >= RC2_VERSION)
     {
         return callRC2(_p, _gasPrice, _origin);
@@ -252,6 +262,10 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 
 bool Executive::callRC2(CallParameters const& _p, u256 const& _gasPrice, Address const& _origin)
 {
+    /**
+     * 使用V2协议调用合约
+     */
+
     // no nonce increase
 
     m_savepoint = m_s->savepoint();

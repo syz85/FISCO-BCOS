@@ -259,6 +259,34 @@ private:
 
     void getBatchReceipts(Json::Value& _response, dev::eth::Block::Ptr _block,
         std::string const& _from, std::string const& _size, bool _compress);
+
+    // 函数对应表
+    bool m_isInitialized = false;
+    // 添加轻节点
+    uint32_t m_addLightFunctionID;
+    uint32_t m_addSealerFunctionID;
+    const char* const CSS_METHOD_ADD_LIGHT = "addLight(string)";
+    const char* const CSS_METHOD_ADD_SEALER = "addSealer(string)";
+
+    void initFunctionID()
+    {
+        if (m_isInitialized)
+        {
+            return;
+        }
+
+        m_addSealerFunctionID = getFuncSelectorByFunctionName(CSS_METHOD_ADD_SEALER);
+        m_addLightFunctionID = getFuncSelectorByFunctionName(CSS_METHOD_ADD_LIGHT);
+        m_isInitialized = true;
+    }
+
+    static uint32_t getFuncSelectorByFunctionName(std::string const& _functionName)
+    {
+        uint32_t func = *(uint32_t*)(crypto::Hash(_functionName).ref().cropped(0, 4).data());
+        uint32_t selector = ((func & 0x000000FF) << 24) | ((func & 0x0000FF00) << 8) |
+                            ((func & 0x00FF0000) >> 8) | ((func & 0xFF000000) >> 24);
+        return selector;
+    }
 };
 
 }  // namespace rpc

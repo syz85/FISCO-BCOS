@@ -350,19 +350,19 @@ void SyncMsgEngine::onPeerRequestBlocks(SyncMsgPacket const& _packet)
 //    batchAndSend(blockRLP);
 //}
 
-void DownloadBlocksContainer::batchAndSend(std::shared_ptr<dev::bytes> _blockRLP, bool isHeader)
+void DownloadBlocksContainer::batchAndSend(std::shared_ptr<dev::bytes> _blockRLP, bool isSendHeader)
 {
     // TODO: thread safe
     bytes& blockRLP = *_blockRLP;
 
     if (blockRLP.size() > c_maxPayload)
     {
-        if (isHeader)
+        if (isSendHeader)
         {
             // 如果只发送Header，不应该到这个分支
             SYNC_ENGINE_LOG(ERROR) << LOG_BADGE("Download") << LOG_BADGE("Request") << LOG_BADGE("BlockSync")
                                    << LOG_DESC("Send BIG header packet") << LOG_KV("peer", m_nodeId.abridged())
-                                   << LOG_KV("isHeader", isHeader);
+                                   << LOG_KV("isHeader", isSendHeader);
             return;
         }
         sendBigBlock(blockRLP);
@@ -370,7 +370,7 @@ void DownloadBlocksContainer::batchAndSend(std::shared_ptr<dev::bytes> _blockRLP
     }
 
     // 如果已经积累到一定的数量，则发送库存
-    if (isHeader)
+    if (isSendHeader)
     {
         // 本次发送Header：
         // 1. 如果有Block待发送，则先清空库存
@@ -393,7 +393,7 @@ void DownloadBlocksContainer::batchAndSend(std::shared_ptr<dev::bytes> _blockRLP
 
     // 将新块放入缓存
     m_blockRLPsBatch.emplace_back(blockRLP);
-    if (isHeader)
+    if (isSendHeader)
     {
         m_currentHeaderBatchSize += blockRLP.size();
     }

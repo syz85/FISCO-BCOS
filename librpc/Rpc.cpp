@@ -37,6 +37,10 @@
 #include <boost/algorithm/hex.hpp>
 #include <csignal>
 #include <sstream>
+#include <libexecutive/Common.h>
+#include <libprecompiled/Common.h>
+#include <libethcore/ABI.h>
+
 
 using namespace jsonrpc;
 using namespace dev::rpc;
@@ -1304,9 +1308,38 @@ std::string Rpc::sendRawTransaction(int _groupID, const std::string& _rlp,
             jsToBytes(_rlp, OnFailed::Throw), CheckTransaction::Everything);
         // receive transaction from channel or rpc
         tx->setRpcTx(true);
+
         // 设置本节点为提交交易的节点
         tx->setSubmitNodeID(m_service->id());
-        RPC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_KV("tx->setSubmitNodeID", tx->submitNodeID());
+        RPC_LOG(DEBUG) << LOG_BADGE("syz")
+                       << LOG_KV("tx->setSubmitNodeID", tx->submitNodeID());
+
+        // 还原Transaction，检查是何种操作 (addLight/addSealer/...)
+        if (!m_isInitialized)
+        {
+            initFunctionID();
+        }
+        bytesConstRef txDataRef = bytesConstRef(&tx->data());
+        uint32_t functionID = dev::precompiled::getParamFunc(txDataRef);
+        RPC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_KV("functionID", functionID) << LOG_KV("m_addLightFunctionID", m_addLightFunctionID);
+        if (functionID == m_addLightFunctionID)
+        {
+            bytesConstRef functionParams = txDataRef.cropped(4);
+            std::string lightNodeIDString;
+            dev::eth::ContractABI abi;
+            abi.abiOut(functionParams, lightNodeIDString);
+            boost::to_lower(lightNodeIDString);
+
+            NodeID lightNodeID(lightNodeIDString);
+            tx->setAddLightNodeID(lightNodeID);
+
+            RPC_LOG(DEBUG) << LOG_BADGE("syz") << LOG_BADGE("m_addLightFunctionID") << LOG_KV("lightNodeID", lightNodeID);
+        }
+        else if (functionID == m_addSealerFunctionID)
+        {
+            // TODO: syz: addSealer还没有实现
+        }
+
         auto currentTransactionCallback = m_currentTransactionCallback.get();
 
         uint32_t clientProtocolversion = ProtocolVersion::v1;

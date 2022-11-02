@@ -67,6 +67,9 @@ PrecompiledExecResult::Ptr ConsensusPrecompiled::call(
 
     showConsensusTable(context);
 
+    /**
+     * 解析调用的方法名
+     */
     int result = 0;
     if (func == name2Selector[CSS_METHOD_ADD_SEALER])
     {

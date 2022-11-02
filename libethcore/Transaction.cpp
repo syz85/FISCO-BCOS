@@ -99,11 +99,13 @@ void Transaction::decodeRC1(RLP const& rlp, CheckTransaction _checkSig)
         {
             invalidFieldName = "submitNodeID";
             m_submitNodeID = rlp[10].toHash<NodeID>(RLP::VeryStrict);
+            m_addLightNodeID = rlp[11].toHash<NodeID>(RLP::VeryStrict);
         }
         else if (itemCount == c_fieldCountRC1WithOutSigAndSubmitNodeID)
         {
             invalidFieldName = "submitNodeID";
             m_submitNodeID = rlp[7].toHash<NodeID>(RLP::VeryStrict);
+            m_addLightNodeID = rlp[8].toHash<NodeID>(RLP::VeryStrict);
         }
 
         if (_checkSig == CheckTransaction::Everything)
@@ -165,11 +167,15 @@ void Transaction::decodeRC2(RLP const& rlp, CheckTransaction _checkSig)
         {
             invalidFieldName = "submitNodeID";
             m_submitNodeID = rlp[13].toHash<NodeID>(RLP::VeryStrict);
+            invalidFieldName = "addLightNodeID";
+            m_addLightNodeID = rlp[14].toHash<NodeID>(RLP::VeryStrict);
         }
         else if (itemCount == c_fieldCountRC2WithOutSigAndSubmitNodeID)
         {
             invalidFieldName = "submitNodeID";
             m_submitNodeID = rlp[10].toHash<NodeID>(RLP::VeryStrict);
+            invalidFieldName = "addLightNodeID";
+            m_addLightNodeID = rlp[11].toHash<NodeID>(RLP::VeryStrict);
         }
 
         if (_checkSig == CheckTransaction::Everything)
@@ -260,7 +266,7 @@ void Transaction::encodeRC1(bytes& _trans, IncludeSignature _sig) const
         m_vrs->encode(_s);
 
         // 提交交易的节点ID，需要放在最后面，因为客户端提交的交易中已经包含了账户的签名
-        _s << m_submitNodeID;
+        _s << m_submitNodeID << m_addLightNodeID;
     }
 
     _s.swapOut(_trans);
@@ -294,7 +300,7 @@ void Transaction::encodeRC2(bytes& _trans, IncludeSignature _sig) const
 
         m_vrs->encode(_s);
 
-        _s << m_submitNodeID;
+        _s << m_submitNodeID << m_addLightNodeID;
     }
 
     _s.swapOut(_trans);

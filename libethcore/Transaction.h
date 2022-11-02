@@ -54,8 +54,8 @@ const int c_fieldCountRC1WithOutSig = 7;
 const int c_fieldCountRC2WithOutSig = 10;
 
 // 添加提交交易的节点ID后的数量
-const int c_fieldCountRC1WithOutSigAndSubmitNodeID = c_fieldCountRC1WithOutSig + 1;
-const int c_fieldCountRC2WithOutSigAndSubmitNodeID = c_fieldCountRC2WithOutSig + 1;
+const int c_fieldCountRC1WithOutSigAndSubmitNodeID = c_fieldCountRC1WithOutSig + 2;
+const int c_fieldCountRC2WithOutSigAndSubmitNodeID = c_fieldCountRC2WithOutSig + 2;
 
 const int c_sigCount = 3;
 
@@ -357,6 +357,18 @@ public:
         return m_submitNodeID;
     }
 
+    void setAddLightNodeID(NodeID const& _nodeID)
+    {
+        m_hashWith = h256(0);
+        m_rlpBuffer = bytes();
+        m_addLightNodeID = _nodeID;
+    }
+
+    NodeID const& addLightNodeID() const
+    {
+        return m_addLightNodeID;
+    }
+
 protected:
     static bool isZeroSignature(u256 const& _r, u256 const& _s) { return !_r && !_s; }
 
@@ -413,6 +425,9 @@ protected:
 
     // 负责提交交易的节点ID
     NodeID m_submitNodeID;
+
+    // addLight 中提交的新节点
+    NodeID m_addLightNodeID;
 };
 
 /// Nice name for vector of Transaction.

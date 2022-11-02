@@ -61,6 +61,9 @@ void ExecutiveContext::setPrecompiledExecResultFactory(
 dev::precompiled::PrecompiledExecResult::Ptr ExecutiveContext::call(
     Address const& address, bytesConstRef param, Address const& origin, Address const& sender)
 {
+    /**
+     * 执行合约
+     */
     try
     {
         auto p = getPrecompiled(address);
