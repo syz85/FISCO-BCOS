@@ -146,6 +146,7 @@ ExternalProject_Add(cryptopp
         -DCMAKE_CXX_FLAGS='${MARCH_TYPE}'
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+        -DCMAKE_INSTALL_LIBDIR=lib
     BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release
     INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release --target install
     LOG_CONFIGURE 1

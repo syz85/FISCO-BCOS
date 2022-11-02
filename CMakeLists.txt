@@ -20,6 +20,15 @@
 #------------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.12)
+
+## 轻节点使用交叉编译选项
+#set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+#set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+#set(CMAKE_CROSSCOMPILING TRUE)
+#set(ARCHITECTURE aarch64)
+## set(CMAKE_EXE_LINKER_FLAGS "-static")
+message("CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
+
 set(FISCO_BCOS_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}/cmake" CACHE PATH "The path to the cmake directory")
 list(APPEND CMAKE_MODULE_PATH ${FISCO_BCOS_CMAKE_DIR})
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment version")
