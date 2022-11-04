@@ -44,7 +44,11 @@ if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
     message(FATAL "The ${PROJECT_NAME} does not support compiling on 32-bit systems")
 endif()
 
-EXECUTE_PROCESS(COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE)
+if(NOT ARCHITECTURE)
+    EXECUTE_PROCESS(COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE)
+endif()
+message("CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
+message("ARCHITECTURE: ${ARCHITECTURE}")
 
 macro(configure_project)
      set(NAME ${PROJECT_NAME})

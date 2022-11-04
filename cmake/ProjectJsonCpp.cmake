@@ -42,6 +42,7 @@ ExternalProject_Add(jsoncpp
                -DCMAKE_POSITION_INDEPENDENT_CODE=${BUILD_SHARED_LIBS}
                ${_only_release_configuration}
                -DJSONCPP_WITH_TESTS=OFF
+               -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
                -DJSONCPP_WITH_PKGCONFIG_SUPPORT=OFF
                	# -DCMAKE_C_FLAGS=-Wa,-march=generic64
                	# -DCMAKE_CXX_FLAGS=-Wa,-march=generic64
