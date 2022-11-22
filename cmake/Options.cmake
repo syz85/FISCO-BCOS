@@ -36,7 +36,16 @@ macro(eth_default_option O DEF)
 endmacro()
 
 # common settings
-set(MARCH_TYPE "-march=x86-64 -mtune=generic -fvisibility=hidden -fvisibility-inlines-hidden")
+if(NOT ARCHITECTURE)
+    # set default arch
+    set(MARCH_TYPE "-march=x86-64 -mtune=generic -fvisibility=hidden -fvisibility-inlines-hidden")
+elseif(ARCHITECTURE STREQUAL aarch64)
+    set(MARCH_TYPE "-march=armv8-a -mtune=generic -fvisibility=hidden -fvisibility-inlines-hidden")
+else()
+    message("unknown ARCHITECTURE: ${ARCHITECTURE}")
+    return()
+endif()
+
 set(ETH_CMAKE_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(ETH_SCRIPTS_DIR ${ETH_CMAKE_DIR}/scripts)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
@@ -47,6 +56,9 @@ endif()
 if(NOT ARCHITECTURE)
     EXECUTE_PROCESS(COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE)
 endif()
+
+# print configuration for cross compile
+message("MARCH_TYPE: ${MARCH_TYPE}")
 message("CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
 message("ARCHITECTURE: ${ARCHITECTURE}")
 
