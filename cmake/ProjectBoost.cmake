@@ -49,6 +49,12 @@ set(BOOST_BUILD_FILES ${BOOST_LIB_PREFIX}chrono.a ${BOOST_LIB_PREFIX}date_time.a
         ${BOOST_LIB_PREFIX}thread.a ${BOOST_LIB_PREFIX}program_options.a
         ${BOOST_LIB_PREFIX}serialization.a)
 
+if(ARCHITECTURE STREQUAL aarch64)
+    set(TOOLSET "toolset=gcc-aarch64")
+else()
+    set(TOOLSET "")
+endif()
+
 ExternalProject_Add(boost
     PREFIX ${CMAKE_SOURCE_DIR}/deps
     DOWNLOAD_NO_PROGRESS 1
@@ -57,6 +63,8 @@ ExternalProject_Add(boost
         https://raw.githubusercontent.com/FISCO-BCOS/LargeFiles/master/libs/boost_1_68_0.tar.bz2
         https://osp-1257653870.cos.ap-guangzhou.myqcloud.com/FISCO-BCOS/FISCO-BCOS/deps/boost_1_68_0.tar.bz2
     URL_HASH SHA256=7f6130bc3cf65f56a618888ce9d5ea704fa10b462be126ad053e80e553d6d8b7
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_LIST_DIR}/boost/user-config.jam <SOURCE_DIR>/tools/build/src/user-config.jam
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND ${BOOST_BOOTSTRAP_COMMAND}
     BUILD_COMMAND ${BOOST_BUILD_TOOL} stage
@@ -79,6 +87,8 @@ ExternalProject_Add(boost
         --with-iostreams
         -s NO_BZIP2=1 -s NO_LZMA=1 -s NO_ZSTD=1
         -j${CORES}
+        ${TOOLSET}
+        --debug-configuration
     LOG_CONFIGURE 1
     LOG_BUILD 1
     LOG_INSTALL 1
