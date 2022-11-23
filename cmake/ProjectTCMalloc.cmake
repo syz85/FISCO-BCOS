@@ -7,7 +7,12 @@ if (DEBUG)
     set(TCMALLOC_LIB_NAME "libtcmalloc${CMAKE_STATIC_LIBRARY_SUFFIX}")
 endif()
 
-set(TCMALLOC_CONFIG ./configure CXXFLAGS=-DHAVE_POSIX_MEMALIGN_SYMBOL=1 --enable-frame-pointers ${GPERFTOOLS_OPTIONS} --prefix=${CMAKE_SOURCE_DIR}/deps/src/gperftools)
+if(ARCHITECTURE STREQUAL aarch64)
+    set(TCMALLOC_CONFIG ./configure CXXFLAGS=-DHAVE_POSIX_MEMALIGN_SYMBOL=1 --enable-frame-pointers ${GPERFTOOLS_OPTIONS} --prefix=${CMAKE_SOURCE_DIR}/deps/src/gperftools --host=aarch64-linux-gnu)
+else()
+    set(TCMALLOC_CONFIG ./configure CXXFLAGS=-DHAVE_POSIX_MEMALIGN_SYMBOL=1 --enable-frame-pointers ${GPERFTOOLS_OPTIONS} --prefix=${CMAKE_SOURCE_DIR}/deps/src/gperftools)
+endif ()
+
 
 set(TCMALLOC_MAKE make install)
 
