@@ -21,6 +21,11 @@ ExternalProject_Add(mysqlclient
     URL_HASH SHA256=c8664851487200162b38b6f3c8db69850bd4f0e4c5ff5a6d161dbfb5cb76b6c4
     #please make sure MYSQL_TCP_PORT is set and not equal to 3306
     CMAKE_ARGS  -DMYSQL_TCP_PORT=3305 -DCMAKE_INSTALL_PREFIX=${CMAKE_SOURCE_DIR}/deps/
+#        -DCMAKE_C_FLAGS='${MARCH_TYPE}'
+#        -DCMAKE_CXX_FLAGS='${MARCH_TYPE}'
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+        -DCMAKE_CROSSCOMPILING=1
     BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/deps/lib/libmysqlclient.a
 )
 ExternalProject_Get_Property(mysqlclient SOURCE_DIR)
